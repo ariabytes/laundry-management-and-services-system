@@ -49,8 +49,8 @@ Local laundry shops often rely on manual, paper-based processes for managing ord
 
 ```
 [admins]
-   |
-   v
+   
+   
 [customers]----< [orders] >----[order_statuses]
        |                        |
        |                        v
