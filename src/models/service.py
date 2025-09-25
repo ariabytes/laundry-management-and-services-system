@@ -1,4 +1,4 @@
-from src.db.connection import get_db_connection, db_cursor
+from ..db.connection import get_db_connection, db_cursor
 
 
 def add_service(category_id, service_name, min_price, max_price, price_unit, service_notes):

@@ -1,0 +1,29 @@
+{
+  "customer_id": 14,
+  "order_id": 7,
+  "order_items": [
+    {
+      "order_item_id": 3,
+      "service_id": 1,
+      "service_name": "Machine Wash & Dry",
+      "quantity": 1,
+      "price": 30.0
+    },
+    {
+      "order_item_id": 4,
+      "service_id": 2,
+      "service_name": "Hand Wash & Dry",
+      "quantity": 2,
+      "price": 110.0
+    },
+    {
+      "order_item_id": 5,
+      "service_id": 3,
+      "service_name": "Carpet",
+      "quantity": 3,
+      "price": 240.0
+    }
+  ],
+  "total_price": 380.0,
+  "payment_id": 3
+}

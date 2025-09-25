@@ -1,4 +1,4 @@
-from src.db.connection import get_db_connection, db_cursor
+from ..db.connection import get_db_connection, db_cursor
 
 
 def add_payment_status(payment_status_name):
