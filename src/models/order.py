@@ -1,4 +1,4 @@
-from ..db.connection import get_db_connection, db_cursor
+from db.connection import get_db_connection, db_cursor
 
 
 def add_order(customer_id, order_status_id, order_date, total_price):

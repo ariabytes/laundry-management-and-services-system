@@ -1,4 +1,4 @@
-from connection import get_db_connection, db_cursor
+from db.connection import get_db_connection, db_cursor
 import sys
 import os
 

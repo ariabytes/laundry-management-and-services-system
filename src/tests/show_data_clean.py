@@ -1,12 +1,12 @@
-from src.db.connection import get_db_connection, db_cursor
+from db.connection import get_db_connection, db_cursor
 import sys
 import os
 
-# Add the project root to the Python path
-project_root = os.path.abspath(os.path.join(
-    os.path.dirname(__file__), '..', '..'))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+# # Add the project root to the Python path
+# project_root = os.path.abspath(os.path.join(
+#     os.path.dirname(__file__), '..', '..'))
+# if project_root not in sys.path:
+#     sys.path.insert(0, project_root)
 
 # Now we can import using the full path from project root
 

@@ -1,4 +1,4 @@
-from ..db.connection import get_db_connection, db_cursor
+from db.connection import get_db_connection, db_cursor
 
 
 def add_payment(order_id, amount_paid, payment_date, payment_status_id, payment_method_id):

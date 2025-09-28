@@ -1,4 +1,4 @@
-from ..db.connection import get_db_connection, db_cursor
+from db.connection import get_db_connection, db_cursor
 
 
 def add_order_item(order_id, service_id, quantity, price):

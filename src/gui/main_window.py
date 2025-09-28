@@ -1,13 +1,20 @@
-import sys
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout
+from gui.admin_page import AdminWindow
+from gui.login_page import LoginDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QLineEdit, QWidgetAction, QStyleOptionToolButton, QToolButton, QSizePolicy, QDialog
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QIcon, QPixmap
+from PyQt6.QtGui import QIcon, QPixmap, QResizeEvent, QAction, QActionEvent
+import sys
+from pathlib import Path
+SRC_DIR = Path(__file__).resolve().parents[1]  # ...\LaundrySystem\src
+if str(SRC_DIR) not in sys.path:
+    sys.path.insert(0, str(SRC_DIR))
 
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("La Lavandera")
+        self.admin_win = None  # Will hold the admin page instance
         self.setWindowIcon(QIcon("src/gui/a_logo.png"))
 
         self.setStyleSheet("background-color: #f9f9f9;")
@@ -32,48 +39,46 @@ class MainWindow(QMainWindow):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        vbox = QVBoxLayout(central_widget)
+        # ---- MAIN OUTER LAYOUT ----
+        outer_vbox = QVBoxLayout(central_widget)
 
-        # --- Top bar with Admin button ---
+        # ---------- HEADER ZONE ----------
+        header_vbox = QVBoxLayout()
+
+        # Topbar with Admin button
         topbar = QHBoxLayout()
-        topbar.addStretch()  # pushes button to the right
+        topbar.addStretch()
         admin_btn = QPushButton("Admin Log In")
-        admin_btn.setFixedSize(85, 30)  # make it small
+        admin_btn.setFixedSize(90, 30)
         admin_btn.setStyleSheet("""
             QPushButton {
                 background-color: #e6e6fa;
                 border: 1px solid #122620;
-                border-radius: 5px;
+                border-radius: 15px;
                 font-size: 12px;
                 font-style: italic;
                 padding: 5px; }
-            QPushButton:hover {
-                background-color: #a3b68b; }
-            QPushButton:pressed {
-                background-color: #99af70; }                                                                
-            """)
+            QPushButton:hover { background-color: #a3b68b; }
+            QPushButton:pressed { background-color: #99af70; }
+        """)
+        admin_btn.clicked.connect(self.open_admin_via_login)
         topbar.addWidget(admin_btn)
-        vbox.addLayout(topbar)
+        header_vbox.addLayout(topbar)
 
-        # Icon Label
+        # Banner
         self.icon_label = QLabel()
-        self.icon_label.setAlignment(
-            Qt.AlignmentFlag.AlignCenter)
-        vbox.addWidget(self.icon_label)
+        self.icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        header_vbox.addWidget(self.icon_label)
 
-        # Load original pixmap once
         self.original_pixmap = QPixmap("src/gui/a_main_logo.png")
         self.update_icon()
 
-        # INFO CENTER?
-
-        # Button row (HBox)
+        # Buttons row
         hbox = QHBoxLayout()
         btn1 = QPushButton("Services")
         btn2 = QPushButton("Contact Us")
         btn3 = QPushButton("More Info")
 
-        # Apply style to each button
         self.buttons_style(btn1)
         self.buttons_style(btn2)
         self.buttons_style(btn3)
@@ -81,9 +86,55 @@ class MainWindow(QMainWindow):
         hbox.addWidget(btn1)
         hbox.addWidget(btn2)
         hbox.addWidget(btn3)
+        header_vbox.addLayout(hbox)
 
-        # Add the HBox into the VBox
-        vbox.addLayout(hbox)
+        # Add header zone to outer layout
+        outer_vbox.addLayout(header_vbox)
+
+        # ---------- MAIN ZONE (Search bar centered) ----------
+        main_vbox = QVBoxLayout()
+        main_vbox.addStretch(1)
+
+        # Horizontal layout for search bar + button
+        search_hbox = QHBoxLayout()
+        search_hbox.setSpacing(0)                     # remove gap
+        search_hbox.setContentsMargins(0, 0, 0, 0)    # remove margins
+
+        # Input box
+        tracking_input = QLineEdit()
+        tracking_input.setPlaceholderText("Enter Your Order Tracking ID")
+        tracking_input.setFixedHeight(50)
+        tracking_input.setFixedWidth(600)
+        tracking_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        tracking_input.setStyleSheet("""
+            QLineEdit {
+                background-color: #e6e6fa;   
+                border: 2px solid #122620;   
+                border-radius: 25px;
+                padding-left: 15px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border: 2px solid #a17fc2;
+            }
+        """)
+
+        # Search button
+        search_btn = QPushButton()
+        search_btn.setIcon(QIcon.fromTheme("edit-find"))
+        search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        search_btn.setFixedSize(40, 40)
+        self.buttons_style(search_btn)
+
+        search_hbox.addWidget(tracking_input)
+        search_hbox.addWidget(search_btn)
+
+        # Center horizontally
+        main_vbox.addLayout(search_hbox)
+        main_vbox.addStretch(2)
+
+        outer_vbox.addLayout(main_vbox)
+
 
 # FOR BUTTONS
 
@@ -91,10 +142,9 @@ class MainWindow(QMainWindow):
         button.setStyleSheet("""
             QPushButton {
                 background-color: #e6e6fa;
-                border: 1px solid #122620;
-                border-radius: 5px;
+                border: 0px solid #122620;
+                border-radius: 20px;
                 font-size: 16px;
-                font-style: italic;
                 padding: 10px; }
             QPushButton:hover {
                 background-color: #c8b3ee; }
@@ -121,9 +171,35 @@ class MainWindow(QMainWindow):
             self.icon_label.setPixmap(scaled)
             self.icon_label.setFixedHeight(banner_height)
 
+    # FOR BACK TO MAINS
+    def open_admin_via_login(self):
+        dlg = LoginDialog(self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:  # ✅ explicit check
+            self.open_admin()
+
+    def open_admin(self):
+        if self.admin_win is None:
+            self.admin_win = AdminWindow()
+            self.admin_win.back_requested.connect(self.on_admin_back)
+            self.admin_win.destroyed.connect(
+                lambda _: setattr(self, "admin_win", None))
+        self.hide()
+        self.admin_win.show()
+        self.admin_win.activateWindow()
+        self.admin_win.raise_()
+
+    def on_admin_back(self):
+        if self.admin_win is not None:
+            try:
+                self.admin_win.back_requested.disconnect(self.on_admin_back)
+            except Exception:
+                pass
+            self.admin_win.close()
+        self.show()
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
+    w = MainWindow()
+    w.show()
     sys.exit(app.exec())
