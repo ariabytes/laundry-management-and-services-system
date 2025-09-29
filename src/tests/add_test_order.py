@@ -10,15 +10,15 @@ sys.path.insert(0, parent_dir)
 sys.path.insert(0, os.path.join(parent_dir, 'db'))
 
 
-def add_complete_order():
+def add_student_order():
     """
-    Test script to add a complete order with:
+    Test script to add a student customer's order with:
     1. Customer
     2. Order
-    3. Order Items (services)
+    3. Order Items (basic laundry services)
     4. Payment
     """
-    print("🛒 Creating Complete Order Test Data...\n")
+    print("🛒 Creating Student Laundry Test Data...\n")
 
     conn = get_db_connection()
     if not conn:
@@ -37,10 +37,10 @@ def add_complete_order():
                 VALUES (%s, %s, %s, %s)
             """
             cursor.execute(customer_sql, (
-                "Maria Santos",
-                "09171234567",
-                "maria.santos@email.com",
-                "123 Sampaguita Street, Quezon City"
+                "Juan Dela Cruz",
+                "09175551234",
+                "juan.delacruz@studentmail.com",
+                "Dormitory A, University Belt, Manila"
             ))
             customer_id = cursor.lastrowid
             order_data['customer_id'] = customer_id
@@ -65,16 +65,20 @@ def add_complete_order():
             # Step 3: Add Order Items (Services)
             print("\n🧼 Step 3: Adding Order Items...")
 
-            # Get some services to add
+            # Student uses Machine Wash & Dry + Hand Wash & Dry
+            service_ids = [1, 2]  # Machine Wash & Dry, Hand Wash & Dry
             cursor.execute(
-                "SELECT service_id, service_name, min_price FROM services LIMIT 3")
+                "SELECT service_id, service_name, min_price FROM services WHERE service_id IN (%s, %s)",
+                service_ids
+            )
             services = cursor.fetchall()
 
             order_items = []
             total_calculated = 0
 
             for i, service in enumerate(services):
-                quantity = i + 1  # 1, 2, 3 quantities
+                quantity = 5 if service['service_id'] == 1 else 2
+                # 5 kg Machine Wash & Dry, 2 kg Hand Wash & Dry
                 price = float(service['min_price']) * quantity
                 total_calculated += price
 
@@ -95,7 +99,7 @@ def add_complete_order():
                 })
 
                 print(
-                    f"   ✅ Added {quantity}x {service['service_name']} - ₱{price:.2f}")
+                    f"   ✅ Added {quantity}{'kg' if service['service_id'] in (1, 2) else ''} {service['service_name']} - ₱{price:.2f}")
 
             order_data['order_items'] = order_items
             order_data['total_price'] = total_calculated
@@ -138,26 +142,25 @@ def add_complete_order():
             conn.commit()
 
             # Display Summary
-            print(f"\n🎉 COMPLETE ORDER CREATED SUCCESSFULLY!")
+            print(f"\n🎉 STUDENT ORDER CREATED SUCCESSFULLY!")
             print(f"📊 Order Summary:")
-            print(f"   Customer ID: {customer_id} (Maria Santos)")
+            print(f"   Customer ID: {customer_id} (Juan Dela Cruz)")
             print(f"   Order ID: {order_id}")
             print(f"   Order Items: {len(order_items)} services")
             print(f"   Total Amount: ₱{total_calculated:.2f}")
             print(f"   Payment ID: {payment_id}")
             print(f"   Status: Queueing (Paid)")
 
-            # Save order data to file for deletion script
-            import json
-            with open('last_test_order.json', 'w') as f:
-                # Convert datetime objects to strings for JSON serialization
-                order_data_json = order_data.copy()
-                json.dump(order_data_json, f, indent=2, default=str)
+            # # Save order data to file for deletion script
+            # import json
+            # with open('last_student_order.json', 'w') as f:
+            #     order_data_json = order_data.copy()
+            #     json.dump(order_data_json, f, indent=2, default=str)
 
-            print(f"\n💾 Order details saved to 'last_test_order.json'")
-            print(f"🗑️  Use 'delete_test_order.py' to remove this test data")
+            # print(f"\n💾 Order details saved to 'last_student_order.json'")
+            # print(f"🗑️  Use 'delete_test_order.py' to remove this test data")
 
-            return order_data
+            # return order_data
 
     except Exception as e:
         print(f"❌ Error creating order: {e}")
@@ -168,4 +171,4 @@ def add_complete_order():
 
 
 if __name__ == "__main__":
-    add_complete_order()
+    add_student_order()
