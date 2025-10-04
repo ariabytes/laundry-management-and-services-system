@@ -2,6 +2,9 @@ from db.connection import get_db_connection, db_cursor
 
 
 def add_customer(name, phone, email, address):
+    """
+    Add a new customer to the database.
+    """
     conn = get_db_connection()
     if not conn:
         return False
@@ -19,12 +22,25 @@ def add_customer(name, phone, email, address):
 
 
 def get_customer_by_id(customer_id):
+    """
+    Retrieve a customer by ID.
+    Aliases are used so GUI keys match ('contact_number', 'email', 'address').
+    """
     conn = get_db_connection()
     if not conn:
         return None
     try:
         with db_cursor(conn) as cursor:
-            sql = "SELECT * FROM customers WHERE customer_id = %s"
+            sql = """
+                SELECT
+                    customer_id,
+                    customer_name,
+                    customer_phone AS contact_number,
+                    customer_email AS email,
+                    customer_address AS address
+                FROM customers
+                WHERE customer_id = %s
+            """
             cursor.execute(sql, (customer_id,))
             return cursor.fetchone()
     finally:
@@ -32,12 +48,24 @@ def get_customer_by_id(customer_id):
 
 
 def get_all_customers():
+    """
+    Retrieve all customers from the database.
+    Aliases match GUI keys for consistency.
+    """
     conn = get_db_connection()
     if not conn:
         return []
     try:
         with db_cursor(conn) as cursor:
-            sql = "SELECT * FROM customers"
+            sql = """
+                SELECT
+                    customer_id,
+                    customer_name,
+                    customer_phone AS contact_number,
+                    customer_email AS email,
+                    customer_address AS address
+                FROM customers
+            """
             cursor.execute(sql)
             return cursor.fetchall()
     finally:
@@ -45,6 +73,9 @@ def get_all_customers():
 
 
 def update_customer(customer_id, name, phone, email, address):
+    """
+    Update an existing customer's information.
+    """
     conn = get_db_connection()
     if not conn:
         return False
@@ -52,7 +83,11 @@ def update_customer(customer_id, name, phone, email, address):
         with db_cursor(conn) as cursor:
             sql = """
                 UPDATE customers
-                SET customer_name = %s, customer_phone = %s, customer_email = %s, customer_address = %s
+                SET
+                    customer_name = %s,
+                    customer_phone = %s,
+                    customer_email = %s,
+                    customer_address = %s
                 WHERE customer_id = %s
             """
             cursor.execute(sql, (name, phone, email, address, customer_id))
@@ -63,6 +98,9 @@ def update_customer(customer_id, name, phone, email, address):
 
 
 def delete_customer(customer_id):
+    """
+    Delete a customer by ID.
+    """
     conn = get_db_connection()
     if not conn:
         return False

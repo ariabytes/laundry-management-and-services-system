@@ -13,8 +13,8 @@ from models.payment_status import get_all_payment_statuses
 from models.category import get_all_categories
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex
-from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QTableView, QMessageBox, QInputDialog, QHeaderView, QScrollArea, QFrame,
-                             QLineEdit, QComboBox, QTextEdit, QDateEdit, QDoubleSpinBox, QSpinBox, QGroupBox, QFormLayout, QGridLayout, QDialog, QDialogButtonBox, QListWidget, QListWidgetItem, QCheckBox, QStyledItemDelegate)
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QTableView, QMessageBox, QInputDialog, QHeaderView, QScrollArea, QFrame, QLineEdit,
+                             QComboBox, QTextEdit, QDateEdit, QDoubleSpinBox, QSpinBox, QGroupBox, QFormLayout, QGridLayout, QDialog, QDialogButtonBox, QListWidget, QListWidgetItem, QCheckBox, QStyledItemDelegate)
 
 # -------- TABLE --------
 
@@ -151,15 +151,74 @@ class OrdersTableModel(QAbstractTableModel):
             return None
         except (IndexError, ValueError, TypeError):
             return None
-# -------- TABLE --------
+
+
+# -------- ORDER ITEMS TABLE MODEL --------
+class OrderItemsTableModel(QAbstractTableModel):
+    def __init__(self, data=None):
+        super().__init__()
+        self.headers = ["Order ID", "Service Name", "Quantity", "Price"]
+        self._raw_data = data or []
+        self._data = self._convert_data(self._raw_data)
+
+    def _convert_data(self, raw_data):
+        converted = []
+        for row in raw_data:
+            if isinstance(row, dict):
+                service_name = "Unknown Service"
+                if row.get('service_id'):
+                    service = get_service_by_id(row['service_id'])
+                    if service:
+                        service_name = service.get(
+                            'service_name', service_name)
+
+                price = row.get('price', 0)
+                if isinstance(price, Decimal):
+                    price = f"₱ {float(price):.2f}"
+
+                converted.append([
+                    str(row.get('order_id', '')),
+                    service_name,
+                    str(row.get('quantity', '')),
+                    str(price)
+                ])
+            else:
+                converted.append([str(item) for item in row])
+        return converted
+
+    def rowCount(self, parent=QModelIndex()):
+        return len(self._data)
+
+    def columnCount(self, parent=QModelIndex()):
+        return len(self.headers)
+
+    def data(self, index, role=Qt.ItemDataRole.DisplayRole):
+        if not index.isValid():
+            return None
+        if role in (Qt.ItemDataRole.DisplayRole, Qt.ItemDataRole.EditRole):
+            try:
+                return self._data[index.row()][index.column()]
+            except (IndexError, TypeError):
+                return ""
+        return None
+
+    def headerData(self, section, orientation, role=Qt.ItemDataRole.DisplayRole):
+        if role == Qt.ItemDataRole.DisplayRole:
+            if orientation == Qt.Orientation.Horizontal:
+                return self.headers[section]
+        return None
+
+    def update_data(self, new_data):
+        self.beginResetModel()
+        self._raw_data = new_data
+        self._data = self._convert_data(new_data)
+        self.endResetModel()
+
 
 # -------- FOR STATUS COMBOBOX IN TABLE --------
-
-
 class StatusDelegate(QStyledItemDelegate):
     def __init__(self, parent=None):
         super().__init__(parent)
-        # preload all statuses from DB
         self.statuses = get_all_order_statuses()
 
     def createEditor(self, parent, option, index):
@@ -178,27 +237,25 @@ class StatusDelegate(QStyledItemDelegate):
     def setModelData(self, editor, model, index):
         new_status_name = editor.currentText()
         model.setData(index, new_status_name, Qt.ItemDataRole.EditRole)
-# -------- STATUS COMBOBOX IN TABLE --------
 
 
 # -------- MAIN WINDOW --------
 class AdminWindow(QMainWindow):
-    back_requested = pyqtSignal()  # signal MainWindow listens to
+    back_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Admin Page - La Lavandera")
         self.setWindowIcon(QIcon("src/gui/a_logo.png"))
-
         self.setStyleSheet("background-color: #f9f9f9;")
 
-        # ---- FOR TABLE ----
-        # Get orders with error handling
+        # Current selected order
+        self.current_order_id = None
+
+        # Get orders
         try:
             orders_data = get_all_orders()
             print(f"✅ Loaded {len(orders_data)} orders from database")
-            if orders_data:
-                print(f"Sample order: {orders_data[0]}")
         except Exception as e:
             print(f"❌ Error loading orders: {e}")
             import traceback
@@ -206,10 +263,12 @@ class AdminWindow(QMainWindow):
             orders_data = []
 
         # Table model + view
-        print("Creating table model...")
         self.model = OrdersTableModel(orders_data)
         self.table = QTableView()
         self.table.setModel(self.model)
+
+        # Connect selection changed signal
+        self.table.selectionModel().selectionChanged.connect(self.on_selection_changed)
 
         # Set up dropdown editor for Status column
         status_delegate = StatusDelegate(self.table)
@@ -246,26 +305,19 @@ class AdminWindow(QMainWindow):
                 padding: 15px;
                 border: 0px solid #d8cbef;
             }
-            QHeaderView::section:pressed {
-                font-weight: normal; 
-            }
             QTableCornerButton::section {
                 background-color: #d8cbef;
                 border: 0px solid #c8c8d8;
             }
         """)
 
-        # Call UI setup here
         self.initUI()
-
-        # BIG
         self.showMaximized()
 
     def initUI(self):
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
 
-        # ---- MAIN OUTER LAYOUT ----
         outer_vbox = QVBoxLayout(central_widget)
 
         # ---------- HEADER ZONE ----------
@@ -287,33 +339,23 @@ class AdminWindow(QMainWindow):
         """)
 
         back_btn.clicked.connect(self._on_back_clicked)
-        # Close admin page to go back to main
         back_btn.clicked.connect(self.close)
         top_bar.addWidget(back_btn)
         top_bar.addStretch()
 
-        # Logo on the right
+        # Logo
         logo_label = QLabel()
         pixmap = QPixmap("src/gui/a_main_logo.png")
-
-        # Set a fixed height (e.g. 50px) and scale width proportionally
         desired_height = 50
         scaled_pixmap = pixmap.scaledToHeight(
             desired_height,
             Qt.TransformationMode.SmoothTransformation
         )
         logo_label.setPixmap(scaled_pixmap)
-        # only fix height, width auto-adjusts
         logo_label.setFixedHeight(desired_height)
         top_bar.addWidget(logo_label)
 
         header_vbox.addLayout(top_bar)
-        outer_vbox.addLayout(header_vbox)
-
-        main_vbox = QVBoxLayout()
-        main_vbox.addStretch(1)
-
-        outer_vbox.addLayout(main_vbox)
 
         # Buttons row
         hbox = QHBoxLayout()
@@ -330,25 +372,460 @@ class AdminWindow(QMainWindow):
         hbox.addWidget(refresh_btn)
         header_vbox.addLayout(hbox)
 
-        # # Add header zone to outer layout
-        # outer_vbox.addLayout(header_vbox)
-
+        # Add table
         header_vbox.addWidget(self.table)
 
+        outer_vbox.addLayout(header_vbox)
 
-# ---------- MAIN WINDOW METHODS ----------
-    # FOR BACK TO MAIN
+        # ---------- DETAIL CARDS ZONE ----------
+        self.create_detail_cards(outer_vbox)
+
+    def create_detail_cards(self, parent_layout):
+        """Create the three horizontal cards for detailed information"""
+        cards_layout = QHBoxLayout()
+        cards_layout.setSpacing(15)
+
+        # Card styling
+        card_style = """
+            QGroupBox {
+                background-color: #e6e6fa;
+                border: 2px solid #d8cbef;
+                border-radius: 15px;
+                font-size: 16px;
+                font-weight: itatic;
+                padding: 15px;
+                margin-top: 10px;
+            }
+            QGroupBox::title {
+                subcontrol-origin: margin;
+                subcontrol-position: top center;
+                padding: 5px 10px;
+                background-color: #d8cbef;
+                border-radius: 5px;
+            }
+            QLabel {
+                font-size: 13px;
+                font-weight: normal;
+                color: #122620;
+            }
+        """
+
+        # ===== CUSTOMER INFO CARD =====
+        customer_card = QGroupBox("Customer Information")
+        customer_card.setStyleSheet(card_style)
+        customer_card.setMaximumWidth(300)  # Make card narrower
+        customer_layout = QVBoxLayout()
+        customer_layout.setSpacing(8)
+
+        # Customer ID
+        cid_layout = QVBoxLayout()
+        cid_layout.setSpacing(3)
+        cid_title = QLabel("Customer ID")
+        cid_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+        self.customer_id_label = QLabel("-")
+        self.customer_id_label.setStyleSheet(
+            "font-size: 13px; color: #122620; padding: 4px; background-color: #e6e6fa; border-radius: 5px;")
+        cid_layout.addWidget(cid_title)
+        cid_layout.addWidget(self.customer_id_label)
+        customer_layout.addLayout(cid_layout)
+
+        # Customer Name
+        cname_layout = QVBoxLayout()
+        cname_layout.setSpacing(3)
+        cname_title = QLabel("Customer Name")
+        cname_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+        self.customer_name_label = QLabel("-")
+        self.customer_name_label.setStyleSheet(
+            "font-size: 13px; color: #122620; padding: 4px; background-color: #e6e6fa; border-radius: 5px;")
+        cname_layout.addWidget(cname_title)
+        cname_layout.addWidget(self.customer_name_label)
+        customer_layout.addLayout(cname_layout)
+
+        # Contact Number
+        contact_layout = QVBoxLayout()
+        contact_layout.setSpacing(3)
+        contact_title = QLabel("Contact Number")
+        contact_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+        self.customer_contact_label = QLabel("-")
+        self.customer_contact_label.setStyleSheet(
+            "font-size: 13px; color: #122620; padding: 4px; background-color: #e6e6fa; border-radius: 5px;")
+        contact_layout.addWidget(contact_title)
+        contact_layout.addWidget(self.customer_contact_label)
+        customer_layout.addLayout(contact_layout)
+
+        # Email
+        email_layout = QVBoxLayout()
+        email_layout.setSpacing(3)
+        email_title = QLabel("Email")
+        email_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+        self.customer_email_label = QLabel("-")
+        self.customer_email_label.setStyleSheet(
+            "font-size: 13px; color: #122620; padding: 4px; background-color: #e6e6fa; border-radius: 5px;")
+        email_layout.addWidget(email_title)
+        email_layout.addWidget(self.customer_email_label)
+        customer_layout.addLayout(email_layout)
+
+        # Address (multi-line)
+        address_layout = QVBoxLayout()
+        address_layout.setSpacing(3)
+        address_title = QLabel("Address")
+        address_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+        self.customer_address_text = QTextEdit()
+        self.customer_address_text.setReadOnly(True)
+        self.customer_address_text.setMaximumHeight(60)
+        self.customer_address_text.setStyleSheet("""
+            QTextEdit {
+                font-size: 13px; 
+                color: #122620; 
+                padding: 4px; 
+                background-color: #e6e6fa; 
+                border: 0px solid #d8cbef;
+                border-radius: 5px;
+            }
+        """)
+        address_layout.addWidget(address_title)
+        address_layout.addWidget(self.customer_address_text)
+        customer_layout.addLayout(address_layout)
+
+        customer_layout.addStretch()
+        customer_card.setLayout(customer_layout)
+        cards_layout.addWidget(customer_card)
+
+        # ===== ORDER ITEMS CARD =====
+        order_items_card = QGroupBox("Order Items")
+        order_items_card.setStyleSheet(card_style)
+        order_items_layout = QVBoxLayout()
+
+        # Create table for order items
+        self.order_items_model = OrderItemsTableModel([])
+        self.order_items_table = QTableView()
+        self.order_items_table.setModel(self.order_items_model)
+        self.order_items_table.setAlternatingRowColors(True)
+        self.order_items_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch)
+        self.order_items_table.setMaximumHeight(200)
+        self.order_items_table.setStyleSheet("""
+            QTableView {
+                 background-color: transparent;;
+                border: 1px solid #d8cbef;
+                border-radius: 5px;
+                font-size: 12px;
+            }
+            QHeaderView::section {
+                background-color: #d8cbef;
+                padding: 5px;
+                font-size: 12px;
+            }
+        """)
+
+        order_items_layout.addWidget(self.order_items_table)
+        order_items_card.setLayout(order_items_layout)
+        cards_layout.addWidget(order_items_card)
+
+        # ===== PAYMENT INFO CARD =====
+        payment_card = QGroupBox("Payment Information")
+        payment_card.setStyleSheet(card_style)
+        payment_layout = QFormLayout()
+
+        self.total_price_label = QLabel("-")
+
+        # Editable amount paid
+        self.amount_paid_input = QDoubleSpinBox()
+        self.amount_paid_input.setRange(0, 999999.99)
+        self.amount_paid_input.setPrefix("₱ ")
+        self.amount_paid_input.setDecimals(2)
+        self.amount_paid_input.valueChanged.connect(
+            self.on_amount_paid_changed)
+        self.amount_paid_input.setStyleSheet("""
+            QDoubleSpinBox {
+                background-color: transparent;;
+                border: 1px solid #d8cbef;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 13px;
+            }
+        """)
+
+        self.payment_date_label = QLabel("-")
+
+        # Payment method dropdown
+        self.payment_method_combo = QComboBox()
+        self.payment_method_combo.currentIndexChanged.connect(
+            self.on_payment_method_changed)
+        self.payment_method_combo.setStyleSheet("""
+            QComboBox {
+                background-color: transparent;;
+                border: 1px solid #d8cbef;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 13px;
+            }
+        """)
+
+        # Payment status dropdown
+        self.payment_status_combo = QComboBox()
+        self.payment_status_combo.currentIndexChanged.connect(
+            self.on_payment_status_changed)
+        self.payment_status_combo.setStyleSheet("""
+            QComboBox {
+                background-color: transparent;;
+                border: 1px solid #d8cbef;
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 13px;
+            }
+        """)
+
+        payment_layout.addRow("Total Price:", self.total_price_label)
+        payment_layout.addRow("Amount Paid:", self.amount_paid_input)
+        payment_layout.addRow("Payment Date:", self.payment_date_label)
+        payment_layout.addRow("Payment Method:", self.payment_method_combo)
+        payment_layout.addRow("Payment Status:", self.payment_status_combo)
+
+        payment_card.setLayout(payment_layout)
+        cards_layout.addWidget(payment_card)
+
+        # Add cards to main layout
+        parent_layout.addLayout(cards_layout)
+
+        # Load dropdown options
+        self.load_payment_dropdowns()
+
+    def load_payment_dropdowns(self):
+        """Load payment methods and statuses into dropdowns"""
+        # Load payment methods
+        try:
+            methods = get_all_payment_methods()
+            self.payment_method_combo.clear()
+            for method in methods:
+                self.payment_method_combo.addItem(
+                    method['payment_method_name'],
+                    method['payment_method_id']
+                )
+        except Exception as e:
+            print(f"Error loading payment methods: {e}")
+
+        # Load payment statuses
+        try:
+            statuses = get_all_payment_statuses()
+            self.payment_status_combo.clear()
+            for status in statuses:
+                self.payment_status_combo.addItem(
+                    status['payment_status_name'],
+                    status['payment_status_id']
+                )
+        except Exception as e:
+            print(f"Error loading payment statuses: {e}")
+
+    def on_selection_changed(self, selected, deselected):
+        """Handle table row selection changes"""
+        indexes = selected.indexes()
+        if indexes:
+            row = indexes[0].row()
+            self.load_order_details(row)
+
+    def load_order_details(self, row):
+        """Load all details for the selected order"""
+        order_data = self.model.get_order_data(row)
+        if not order_data:
+            return
+
+        order_id = order_data.get('order_id')
+        self.current_order_id = order_id
+
+        # Load customer info
+        customer_id = order_data.get('customer_id')
+        if customer_id:
+            customer = get_customer_by_id(customer_id)
+            if customer:
+                # Debug: print what columns we actually have
+                print(f"Customer data keys: {customer.keys()}")
+                print(f"Customer data: {customer}")
+
+                self.customer_id_label.setText(
+                    str(customer.get('customer_id', '-')))
+                self.customer_name_label.setText(
+                    customer.get('customer_name', '-'))
+
+                # Try different possible column names
+                contact = (customer.get('contact_number') or
+                           customer.get('contact_no') or
+                           customer.get('phone') or
+                           customer.get('phone_number') or '-')
+                self.customer_contact_label.setText(str(contact))
+
+                email = customer.get('email') or customer.get(
+                    'email_address') or '-'
+                self.customer_email_label.setText(str(email))
+
+                address = customer.get('address') or customer.get(
+                    'customer_address') or '-'
+                self.customer_address_text.setPlainText(str(address))
+
+        # Load order items
+        try:
+            order_items = get_order_items_by_order(order_id)
+            self.order_items_model.update_data(order_items)
+        except Exception as e:
+            print(f"Error loading order items: {e}")
+            self.order_items_model.update_data([])
+
+        # Load payment info
+        try:
+            payments = get_payments_by_order(order_id)
+            if payments and len(payments) > 0:
+                payment = payments[0]  # Get first payment
+
+                total_price = order_data.get('total_price', 0)
+                if isinstance(total_price, Decimal):
+                    self.total_price_label.setText(
+                        f"₱{float(total_price):.2f}")
+                else:
+                    self.total_price_label.setText(f"₱{total_price:.2f}")
+
+                # Block signals while setting values to avoid triggering updates
+                self.amount_paid_input.blockSignals(True)
+                amount_paid = payment.get('amount_paid', 0)
+                if isinstance(amount_paid, Decimal):
+                    self.amount_paid_input.setValue(float(amount_paid))
+                else:
+                    self.amount_paid_input.setValue(amount_paid)
+                self.amount_paid_input.blockSignals(False)
+
+                payment_date = payment.get('payment_date', '')
+                if isinstance(payment_date, datetime):
+                    self.payment_date_label.setText(
+                        payment_date.strftime('%Y-%m-%d %H:%M:%S'))
+                else:
+                    self.payment_date_label.setText(str(payment_date))
+
+                # Set payment method
+                self.payment_method_combo.blockSignals(True)
+                method_id = payment.get('payment_method_id')
+                for i in range(self.payment_method_combo.count()):
+                    if self.payment_method_combo.itemData(i) == method_id:
+                        self.payment_method_combo.setCurrentIndex(i)
+                        break
+                self.payment_method_combo.blockSignals(False)
+
+                # Set payment status
+                self.payment_status_combo.blockSignals(True)
+                status_id = payment.get('payment_status_id')
+                for i in range(self.payment_status_combo.count()):
+                    if self.payment_status_combo.itemData(i) == status_id:
+                        self.payment_status_combo.setCurrentIndex(i)
+                        break
+                self.payment_status_combo.blockSignals(False)
+            else:
+                # No payment found
+                self.clear_payment_info()
+        except Exception as e:
+            print(f"Error loading payment info: {e}")
+            self.clear_payment_info()
+
+    def clear_payment_info(self):
+        """Clear payment information fields"""
+        self.total_price_label.setText("-")
+        self.amount_paid_input.setValue(0)
+        self.payment_date_label.setText("-")
+        self.payment_method_combo.setCurrentIndex(0)
+        self.payment_status_combo.setCurrentIndex(0)
+
+    def on_amount_paid_changed(self, value):
+        """Handle amount paid changes"""
+        if not self.current_order_id:
+            return
+
+        try:
+            payments = get_payments_by_order(self.current_order_id)
+            if payments and len(payments) > 0:
+                payment = payments[0]
+                payment_id = payment.get('payment_id')
+
+                # Update payment in database
+                success = update_payment(
+                    payment_id,
+                    self.current_order_id,
+                    Decimal(str(value)),
+                    payment.get('payment_date'),
+                    payment.get('payment_method_id'),
+                    payment.get('payment_status_id')
+                )
+
+                if success:
+                    print(f"✅ Updated amount paid to {value}")
+                else:
+                    print("❌ Failed to update amount paid")
+        except Exception as e:
+            print(f"Error updating amount paid: {e}")
+
+    def on_payment_method_changed(self, index):
+        """Handle payment method changes"""
+        if not self.current_order_id or index < 0:
+            return
+
+        try:
+            payments = get_payments_by_order(self.current_order_id)
+            if payments and len(payments) > 0:
+                payment = payments[0]
+                payment_id = payment.get('payment_id')
+                method_id = self.payment_method_combo.itemData(index)
+
+                success = update_payment(
+                    payment_id,
+                    self.current_order_id,
+                    payment.get('amount_paid'),
+                    payment.get('payment_date'),
+                    method_id,
+                    payment.get('payment_status_id')
+                )
+
+                if success:
+                    print(f"✅ Updated payment method")
+                else:
+                    print("❌ Failed to update payment method")
+        except Exception as e:
+            print(f"Error updating payment method: {e}")
+
+    def on_payment_status_changed(self, index):
+        """Handle payment status changes"""
+        if not self.current_order_id or index < 0:
+            return
+
+        try:
+            payments = get_payments_by_order(self.current_order_id)
+            if payments and len(payments) > 0:
+                payment = payments[0]
+                payment_id = payment.get('payment_id')
+                status_id = self.payment_status_combo.itemData(index)
+
+                success = update_payment(
+                    payment_id,
+                    self.current_order_id,
+                    payment.get('amount_paid'),
+                    payment.get('payment_date'),
+                    payment.get('payment_method_id'),
+                    status_id
+                )
+
+                if success:
+                    print(f"✅ Updated payment status")
+                else:
+                    print("❌ Failed to update payment status")
+        except Exception as e:
+            print(f"Error updating payment status: {e}")
 
     def _on_back_clicked(self):
-        # ask MainWindow to handle going back
         self.back_requested.emit()
 
     def closeEvent(self, event):
-        # If user closes the admin window via the X button, also request back
         self.back_requested.emit()
         super().closeEvent(event)
-
-    # FOR BUTTONS STYLE HEHE
 
     def buttons_style(self, button):
         button.setStyleSheet("""
@@ -363,7 +840,6 @@ class AdminWindow(QMainWindow):
             QPushButton:pressed {
                 background-color: #b9a9f6; }                                                                
             """)
-# -------- MAIN WINDOW --------
 
 
 # Main execution
