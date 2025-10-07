@@ -33,7 +33,7 @@ def get_all_payment_statuses():
     if not conn:
         return []
     try:
-        with db_cursor(conn) as cursor:
+        with db_cursor(conn, dictionary=True) as cursor:
             sql = "SELECT * FROM payment_statuses"
             cursor.execute(sql)
             return cursor.fetchall()

@@ -112,3 +112,16 @@ def delete_customer(customer_id):
             return cursor.rowcount > 0
     finally:
         conn.close()
+
+
+def get_customer_by_contact(contact_number):
+    conn = get_db_connection()
+    if not conn:
+        return None
+    try:
+        with db_cursor(conn) as cursor:
+            sql = "SELECT * FROM customers WHERE contact_number = %s"
+            cursor.execute(sql, (contact_number,))
+            return cursor.fetchone()
+    finally:
+        conn.close()

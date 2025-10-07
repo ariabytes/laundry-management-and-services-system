@@ -1,6 +1,6 @@
 from gui.admin_page import AdminWindow
 from gui.login_page import LoginDialog
-from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QLineEdit, QWidgetAction, QStyleOptionToolButton, QToolButton, QSizePolicy, QDialog
+from PyQt6.QtWidgets import QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QLineEdit, QWidgetAction, QStyleOptionToolButton, QToolButton, QSizePolicy, QDialog, QMessageBox
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon, QPixmap, QResizeEvent, QAction, QActionEvent
 import sys
@@ -76,17 +76,14 @@ class MainWindow(QMainWindow):
         # Buttons row
         hbox = QHBoxLayout()
         btn1 = QPushButton("Services")
-        btn2 = QPushButton("Contact Us")
-        btn3 = QPushButton("More Info")
+        btn1.setMaximumSize(150, 40)
 
         self.buttons_style(btn1)
-        self.buttons_style(btn2)
-        self.buttons_style(btn3)
 
         hbox.addWidget(btn1)
-        hbox.addWidget(btn2)
-        hbox.addWidget(btn3)
         header_vbox.addLayout(hbox)
+
+        btn1.clicked.connect(self.open_services_page)
 
         # Add header zone to outer layout
         outer_vbox.addLayout(header_vbox)
@@ -124,6 +121,12 @@ class MainWindow(QMainWindow):
         search_btn.setIcon(QIcon.fromTheme("edit-find"))
         search_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         search_btn.setFixedSize(40, 40)
+
+        search_btn.clicked.connect(
+            lambda: self.open_tracking_dialog(tracking_input.text().strip()))
+
+        search_btn.clicked.connect(lambda: tracking_input.clear())
+
         self.buttons_style(search_btn)
 
         search_hbox.addWidget(tracking_input)
@@ -135,6 +138,25 @@ class MainWindow(QMainWindow):
 
         outer_vbox.addLayout(main_vbox)
 
+        # ---------- FOOTER / CONTACT BANNER ----------
+        footer = QHBoxLayout()
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        contact_label = QLabel(
+            "0912-345-6789   |   Purok 6, Barangay Gabriela, Davao City   |   la_lavandera@gmail.com")
+        contact_label.setStyleSheet("""
+            QLabel {
+                font-size: 13px;
+                font-style: italic;
+                color: #333;
+                background-color: #e6e6fa;
+                border-top: 1px solid #ccc;
+                padding: 10px 10px;
+                border-radius: 8px;
+            }
+        """)
+        footer.addWidget(contact_label)
+        outer_vbox.addLayout(footer)
 
 # FOR BUTTONS
 
@@ -171,18 +193,47 @@ class MainWindow(QMainWindow):
             self.icon_label.setPixmap(scaled)
             self.icon_label.setFixedHeight(banner_height)
 
+    # FOR TRACKING DIALOG
+    def open_tracking_dialog(self, order_id_text):
+        if not order_id_text.isdigit():
+            QMessageBox.warning(self, "Invalid Input",
+                                "Please enter a valid Order ID (numbers only).")
+            return
+
+        from gui.track_order_page import TrackOrderDialog
+        dlg = TrackOrderDialog(int(order_id_text), self)
+        dlg.exec()
+
+    # FOR SERVICES PAGE
+    def open_services_page(self):
+        from gui.services_page import ServicesPage
+        dlg = ServicesPage(self)
+        dlg.exec()
+
     # FOR BACK TO MAINS
+
     def open_admin_via_login(self):
         dlg = LoginDialog(self)
         if dlg.exec() == QDialog.DialogCode.Accepted:  # ✅ explicit check
             self.open_admin()
 
     def open_admin(self):
-        if self.admin_win is None:
-            self.admin_win = AdminWindow()
-            self.admin_win.back_requested.connect(self.on_admin_back)
-            self.admin_win.destroyed.connect(
-                lambda _: setattr(self, "admin_win", None))
+        # Always create a fresh admin window
+        if self.admin_win is not None:
+            # Clean up any existing window
+            try:
+                self.admin_win.back_requested.disconnect(self.on_admin_back)
+            except:
+                pass
+            self.admin_win.close()
+            self.admin_win = None
+
+        # Create new admin window
+        self.admin_win = AdminWindow()
+        self.admin_win.back_requested.connect(self.on_admin_back)
+        self.admin_win.destroyed.connect(
+            lambda: setattr(self, "admin_win", None))
+
         self.hide()
         self.admin_win.show()
         self.admin_win.activateWindow()
@@ -195,6 +246,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self.admin_win.close()
+            self.admin_win = None  # Add this line!
         self.show()
 
 

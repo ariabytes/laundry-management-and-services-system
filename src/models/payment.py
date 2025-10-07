@@ -73,3 +73,20 @@ def add_payment(order_id, amount_paid, payment_date, payment_method_id, payment_
             return cursor.lastrowid
     finally:
         conn.close()
+
+
+def delete_payment(payment_id):
+    """
+    Delete a payment record by ID.
+    """
+    conn = get_db_connection()
+    if not conn:
+        return False
+    try:
+        with db_cursor(conn) as cursor:
+            sql = "DELETE FROM payments WHERE payment_id = %s"
+            cursor.execute(sql, (payment_id,))
+            conn.commit()
+            return cursor.rowcount > 0
+    finally:
+        conn.close()

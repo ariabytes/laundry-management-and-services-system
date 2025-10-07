@@ -11,6 +11,8 @@ from models.service import get_service_by_id, get_all_services
 from models.payment_method import get_all_payment_methods
 from models.payment_status import get_all_payment_statuses
 from models.category import get_all_categories
+from gui.order_form_page import AddOrderDialog
+
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QVBoxLayout, QPushButton, QHBoxLayout, QTableView, QMessageBox, QInputDialog, QHeaderView, QScrollArea, QFrame, QLineEdit,
@@ -287,8 +289,8 @@ class AdminWindow(QMainWindow):
                 background-color: #e6e6fa;
                 border: 0px solid #122620;
                 border-radius: 20px;
-                font-size: 14px;
-                padding: 15px; 
+                font-size: 12px;
+                padding: 10px; 
             }
             QTableView::item:hover {
                 background-color: #d8cbef;            
@@ -300,9 +302,9 @@ class AdminWindow(QMainWindow):
             QHeaderView::section {
                 background-color: #d8cbef;
                 color: black;
-                font-size: 15px;
+                font-size: 13px;
                 font-weight: normal;  
-                padding: 15px;
+                padding: 10px;
                 border: 0px solid #d8cbef;
             }
             QTableCornerButton::section {
@@ -361,15 +363,15 @@ class AdminWindow(QMainWindow):
         hbox = QHBoxLayout()
         add_btn = QPushButton("Add Order")
         del_btn = QPushButton("Delete Order")
-        refresh_btn = QPushButton("Refresh Orders")
+
+        add_btn.clicked.connect(self.open_order_form_page)
+        del_btn.clicked.connect(self.delete_selected_order)
 
         self.buttons_style(add_btn)
         self.buttons_style(del_btn)
-        self.buttons_style(refresh_btn)
 
         hbox.addWidget(add_btn)
         hbox.addWidget(del_btn)
-        hbox.addWidget(refresh_btn)
         header_vbox.addLayout(hbox)
 
         # Add table
@@ -511,15 +513,30 @@ class AdminWindow(QMainWindow):
         self.order_items_table.setMaximumHeight(200)
         self.order_items_table.setStyleSheet("""
             QTableView {
-                 background-color: transparent;;
-                border: 1px solid #d8cbef;
+                background-color: #e6e6fa;
+                border: 0px solid #122620;
                 border-radius: 5px;
                 font-size: 12px;
+                padding: 5px; 
+            }
+            QTableView::item:hover {
+                background-color: #d8cbef;            
+            }
+            QTableView::item:selected {
+                background-color: #c9c9f6;
+                color: black;
             }
             QHeaderView::section {
                 background-color: #d8cbef;
+                color: black;
+                font-size: 13px;
+                font-weight: normal;  
                 padding: 5px;
-                font-size: 12px;
+                border: 0px solid #d8cbef;
+            }
+            QTableCornerButton::section {
+                background-color: #d8cbef;
+                border: 0px solid #c8c8d8;
             }
         """)
 
@@ -581,11 +598,35 @@ class AdminWindow(QMainWindow):
             }
         """)
 
-        payment_layout.addRow("Total Price:", self.total_price_label)
-        payment_layout.addRow("Amount Paid:", self.amount_paid_input)
-        payment_layout.addRow("Payment Date:", self.payment_date_label)
-        payment_layout.addRow("Payment Method:", self.payment_method_combo)
-        payment_layout.addRow("Payment Status:", self.payment_status_combo)
+        total_title = QLabel("Total Price")
+        total_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+        self.total_price_label.setStyleSheet(
+            "font-size: 13px; color: #122620; padding: 4px; background-color: #e6e6fa; border-radius: 5px;")
+
+        amount_title = QLabel("Amount Paid")
+        amount_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+
+        payment_date_title = QLabel("Payment Date")
+        payment_date_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+        self.payment_date_label.setStyleSheet(
+            "font-size: 13px; color: #122620; padding: 4px; background-color: #e6e6fa; border-radius: 5px;")
+
+        method_title = QLabel("Payment Method")
+        method_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+
+        status_title = QLabel("Payment Status")
+        status_title.setStyleSheet(
+            "font-weight: bold; font-size: 11px; color: #666; background-color: transparent;")
+
+        payment_layout.addRow(total_title, self.total_price_label)
+        payment_layout.addRow(amount_title, self.amount_paid_input)
+        payment_layout.addRow(payment_date_title, self.payment_date_label)
+        payment_layout.addRow(method_title, self.payment_method_combo)
+        payment_layout.addRow(status_title, self.payment_status_combo)
 
         payment_card.setLayout(payment_layout)
         cards_layout.addWidget(payment_card)
@@ -824,8 +865,93 @@ class AdminWindow(QMainWindow):
         self.back_requested.emit()
 
     def closeEvent(self, event):
-        self.back_requested.emit()
+        # self.back_requested.emit()
         super().closeEvent(event)
+
+    def open_order_form_page(self):
+        dialog = AddOrderDialog(self)
+        if dialog.exec():
+            self.model.update_data(get_all_orders())
+
+    def delete_selected_order(self):
+        """Delete the selected order and related data (payments, items, and customer if no other orders)"""
+        indexes = self.table.selectionModel().selectedRows()
+        if not indexes:
+            QMessageBox.warning(self, "No Selection",
+                                "Please select an order to delete.")
+            return
+
+        row = indexes[0].row()
+        order_data = self.model.get_order_data(row)
+        order_id = order_data.get("order_id")
+        customer_id = order_data.get("customer_id")
+
+        if not order_id:
+            QMessageBox.warning(
+                self, "Error", "Could not find Order ID for the selected row.")
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Delete",
+            f"Are you sure you want to delete Order ID {order_id}, its related records, "
+            "and the customer (if they have no other orders)?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+
+        try:
+            # Step 1: Delete payments
+            from models.payment import get_payments_by_order, delete_payment
+            payments = get_payments_by_order(order_id)
+            for p in payments:
+                delete_payment(p["payment_id"])
+
+            # Step 2: Delete order items
+            from models.order_item import get_order_items_by_order, delete_order_item
+            order_items = get_order_items_by_order(order_id)
+            for item in order_items:
+                delete_order_item(item["order_item_id"])
+
+            # Step 3: Delete order itself
+            success = delete_order(order_id)
+
+            # Step 4: Delete customer if they have no other orders
+            if customer_id:
+                from models.order import get_all_orders
+                from models.customer import delete_customer
+                remaining_orders = [
+                    o for o in get_all_orders() if o["customer_id"] == customer_id
+                ]
+                if len(remaining_orders) == 0:
+                    delete_customer(customer_id)
+                    print(
+                        f"🧹 Customer ID {customer_id} deleted (no remaining orders)")
+
+            if success:
+                QMessageBox.information(
+                    self,
+                    "Deleted",
+                    f"Order ID {order_id} (and customer if applicable) has been deleted."
+                )
+                # Refresh table + clear info
+                self.model.update_data(get_all_orders())
+                self.clear_payment_info()
+                self.customer_id_label.setText("-")
+                self.customer_name_label.setText("-")
+                self.customer_contact_label.setText("-")
+                self.customer_email_label.setText("-")
+                self.customer_address_text.setPlainText("-")
+                self.order_items_model.update_data([])
+            else:
+                QMessageBox.warning(
+                    self, "Failed", "Failed to delete order from database.")
+
+        except Exception as e:
+            QMessageBox.critical(
+                self, "Error", f"An error occurred while deleting the order:\n{e}")
 
     def buttons_style(self, button):
         button.setStyleSheet("""

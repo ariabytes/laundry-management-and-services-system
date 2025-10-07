@@ -40,11 +40,37 @@ def get_all_services():
     if not conn:
         return []
     try:
-        with db_cursor(conn) as cursor:
-            sql = "SELECT * FROM services"
+        with db_cursor(conn, dictionary=True) as cursor:
+            sql = """
+                SELECT 
+                    s.service_id,
+                    s.category_id,
+                    c.category_name,
+                    s.service_name,
+                    s.min_price,
+                    s.max_price,
+                    s.price_unit,
+                    s.service_notes
+                FROM services s
+                JOIN categories c ON s.category_id = c.category_id
+                ORDER BY c.category_name, s.service_name
+            """
             cursor.execute(sql)
             rows = cursor.fetchall()
-            return rows  # Already a list of dicts!
+            return rows  # list of dicts with category_name included
+    finally:
+        conn.close()
+
+
+def get_services_by_category(category_id):
+    conn = get_db_connection()
+    if not conn:
+        return []
+    try:
+        with db_cursor(conn) as cursor:
+            sql = "SELECT * FROM services WHERE category_id = %s"
+            cursor.execute(sql, (category_id,))
+            return cursor.fetchall()
     finally:
         conn.close()
 
