@@ -60,4 +60,5 @@ bin/
 !src/
 
 __pycache__/
-*.pyc
+*.pyc.env
+.vscode
