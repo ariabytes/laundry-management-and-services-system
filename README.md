@@ -328,6 +328,34 @@ classDiagram
 ## 🧩 Use Case Diagram
 
 ```mermaid
+usecaseDiagram
+    actor Admin as A
+    actor Customer as C
+
+    rectangle "La Lavandera: Laundry Monitoring & Services System" {
+        (Login) as UC1
+        (Add Laundry Order) as UC2
+        (Update Laundry Status) as UC3
+        (Update Payment Status) as UC4
+        (View All Orders) as UC5
+        (Delete or Update Orders) as UC6
+        (Track Order Status) as UC7
+        (View Services and Prices) as UC8
+    }
+
+    A --> UC1
+    A --> UC2
+    A --> UC3
+    A --> UC4
+    A --> UC5
+    A --> UC6
+
+    C --> UC7
+    C --> UC8
+
+```
+
+```mermaid
 graph TB
     %% Actors
     Admin[👨‍💼 Admin/Staff]
