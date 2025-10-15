@@ -14,10 +14,14 @@ from PyQt6.QtGui import QIcon, QPixmap
 from models.service import get_all_services
 from models.payment_method import get_all_payment_methods
 from models.payment_status import get_all_payment_statuses
-from models.customer import add_customer
+from models.customer_class import add_customer
 from models.order import add_order
 from models.order_item import add_order_item
 from models.payment import add_payment
+
+# NEW: Import OOP classes
+from models.order_validator import OrderValidator, PaymentProcessor
+from models.status_factory import PaymentStatusFactory
 
 
 class AddOrderDialog(QDialog):
@@ -29,6 +33,9 @@ class AddOrderDialog(QDialog):
         self.setWindowIcon(QIcon("src/gui/a_logo.png"))
 
         self.service_widgets = []
+
+        # NEW: Create validator instance
+        self.validator = OrderValidator()
 
         self.setStyleSheet("""
             background-color: #f9f9f9;
@@ -210,7 +217,7 @@ class AddOrderDialog(QDialog):
         payment_layout.addWidget(status_label)
         payment_layout.addWidget(self.payment_status_combo)
 
-        payment_layout.addStretch(1)  # Push contents to top
+        payment_layout.addStretch(1)
 
         payment_box.setLayout(payment_layout)
 
@@ -321,7 +328,6 @@ class AddOrderDialog(QDialog):
                 container.setLayout(row)
                 cat_layout.addWidget(container)
 
-                # store service_id and service_name for reliable insertion later
                 self.service_widgets.append({
                     "service_id": s.get("service_id"),
                     "service_name": s.get("service_name"),
@@ -344,7 +350,7 @@ class AddOrderDialog(QDialog):
             if item["checkbox"].isChecked():
                 total += item["qty"].value() * item["price"].value()
         self.total_input.setText(f"₱{total:,.2f}")
-        self.sync_amount_paid()  # Keep Amount Paid synced if Paid
+        self.sync_amount_paid()
 
     def load_payment_dropdowns(self):
         self.payment_method_combo.clear()
@@ -360,71 +366,103 @@ class AddOrderDialog(QDialog):
             print(f"Error loading dropdowns: {e}")
 
     def sync_amount_paid(self):
-        """Automatically set Amount Paid if status = 'Paid'."""
-        status = self.payment_status_combo.currentText().lower()
-        if status == "paid":
-            self.amount_paid_input.setText(
-                self.total_input.text().replace("₱", "").replace(",", "").strip())
-        elif not self.amount_paid_input.text():
-            self.amount_paid_input.clear()
+        """NEW: Use PaymentStatusFactory to determine amount paid"""
+        status_name = self.payment_status_combo.currentText()
+        status = PaymentStatusFactory.create(status_name)
 
-    # ---------- Save ----------
+        total_text = self.total_input.text().replace("₱", "").replace(",", "").strip()
+        try:
+            total = Decimal(total_text) if total_text else Decimal("0")
+        except:
+            total = Decimal("0")
+
+        # Get amount from status object
+        amount = status.get_amount_paid(total)
+
+        if not status.can_modify_amount():
+            self.amount_paid_input.setText(f"{float(amount):.2f}")
+            self.amount_paid_input.setReadOnly(True)
+        else:
+            self.amount_paid_input.setReadOnly(False)
+            if not self.amount_paid_input.text():
+                self.amount_paid_input.setText(f"{float(amount):.2f}")
+
+    # ---------- Save Order (UPDATED WITH VALIDATION) ----------
     def save_order(self):
+        # Get form data
         name = self.customer_name.text().strip()
         contact = self.contact_number.text().strip()
         email = self.email.text().strip()
         address = self.address.toPlainText().strip()
 
-        if not name or not contact:
+        # NEW: Use validator class for customer info
+        if not self.validator.validate_customer_info(name, contact, email, address):
             QMessageBox.warning(
-                self, "Missing Info", "Customer name and contact number are required.")
+                self, "Validation Error", self.validator.get_error_message())
             return
 
+        # Collect selected services
         selected = []
-        total = Decimal("0.00")
         for i in self.service_widgets:
             if i["checkbox"].isChecked():
-                qty = i["qty"].value()
-                price = Decimal(str(i["price"].value()))
-                total += qty * price
-                # keep service_id and name so we can insert order_items reliably
                 selected.append({
                     "service_id": i.get("service_id"),
                     "service_name": i.get("service_name"),
-                    "qty": qty,
-                    "price": price
+                    "qty": i["qty"].value(),
+                    "price": i["price"].value()
                 })
 
-        if not selected:
-            QMessageBox.warning(self, "No Services",
-                                "Please select at least one service.")
+        # NEW: Use validator class for order items
+        if not self.validator.validate_order_items(selected):
+            QMessageBox.warning(
+                self, "Validation Error", self.validator.get_error_message())
+            return
+
+        # NEW: Use PaymentProcessor to calculate total
+        total = PaymentProcessor.calculate_total(selected)
+
+        # NEW: Use validator for payment validation
+        amount_paid_text = self.amount_paid_input.text().strip()
+        try:
+            amount_paid = Decimal(
+                amount_paid_text) if amount_paid_text else Decimal("0")
+        except:
+            amount_paid = Decimal("0")
+
+        payment_status = self.payment_status_combo.currentText()
+
+        if not self.validator.validate_payment(amount_paid, total, payment_status):
+            QMessageBox.warning(
+                self, "Validation Error", self.validator.get_error_message())
             return
 
         try:
-            # Add or get customer
+            # Add customer
             cust_id = add_customer(name, contact, email, address)
 
-            # Determine payment and order statuses
+            # Get payment info
             method_id = self.payment_method_combo.currentData()
             status_id = self.payment_status_combo.currentData()
-            status_text = self.payment_status_combo.currentText().strip().lower()
 
+            # NEW: Use PaymentStatusFactory to determine payment details
+            status = PaymentStatusFactory.create(payment_status)
+            payment_date = status.get_payment_date()
+
+            # Determine order status
             from models.order_status import get_all_order_statuses
             all_statuses = get_all_order_statuses()
 
-            if status_text == "paid":
-                # If already paid, order should start as "Queueing"
+            if payment_status.lower().strip() == "paid":
                 order_status_id = next(
                     (s["order_status_id"] for s in all_statuses if s["order_status_name"].strip(
                     ).lower() == "queueing"),
                     1
                 )
             else:
-                # If not paid, order should start as "Pending Payment"
                 order_status_id = next(
                     (s["order_status_id"] for s in all_statuses if s["order_status_name"].strip(
                     ).lower() == "pending payment"),
-                    1  # fallback if not found
+                    1
                 )
 
             # Add order
@@ -446,19 +484,9 @@ class AddOrderDialog(QDialog):
                         f"⚠️ Could not determine service_id for {sel.get('service_name')}, skipping item.")
                     continue
 
-                # add_order_item returns lastrowid (or True/False depending on implementation)
                 add_order_item(order_id, sid, sel["qty"], float(sel["price"]))
 
-            # Add payment record - Only set payment_date if status is "Paid"
-            amount_paid = Decimal(self.amount_paid_input.text() or "0")
-
-            # Determine payment_date based on payment status
-            if status_text == "paid":
-                payment_date = datetime.now()
-            else:
-                # For pending, unpaid, refunded, cancelled - set to None
-                payment_date = None
-
+            # Add payment record
             add_payment(order_id, amount_paid,
                         payment_date, method_id, status_id)
 

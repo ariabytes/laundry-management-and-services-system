@@ -9,7 +9,7 @@ from PyQt6.QtCore import Qt
 
 # --- Import models ---
 from models.order import get_order_by_id
-from models.customer import get_customer_by_id
+from models.customer_class import get_customer_by_id
 from models.order_status import get_order_status_by_id
 from models.order_item import get_order_items_by_order
 from models.payment import get_payments_by_order

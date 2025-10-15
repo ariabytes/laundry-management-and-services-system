@@ -1,488 +1,233 @@
-# Laundry Monitoring and Services System
+# La Lavandera - Laundry Monitoring and Services System
 
 ## Introduction
 
-The **Laundry Monitoring and Services System** is a Python application (desktop GUI or web) with a MySQL (XAMPP) backend. It streamlines laundry shop operations by enabling administrators to manage orders efficiently and allowing clients to conveniently track their laundry status using a unique Order ID.
+The **La Lavandera Laundry Monitoring and Services System** is a desktop application built with Python and PyQt6, featuring a MySQL backend. It streamlines laundry shop operations by enabling administrators to manage orders, payments, and customer information efficiently, while allowing clients to conveniently track their laundry status using a unique Order ID.
 
 ---
 
 ## Problem Statement
 
-Local laundry shops often rely on manual, paper-based processes for managing orders, receipts, and payments. This results in misplaced orders, inaccurate time estimates, billing errors, and inefficient record-keeping for both business owners and clients.
+Local laundry shops often rely on manual, paper-based processes for managing orders, receipts, and payments. This results in:
+
+- Misplaced orders and lost paperwork
+- Inaccurate time estimates for completion
+- Billing errors and payment disputes
+- Inefficient record-keeping for both business owners and clients
+- Difficulty tracking order status in real-time
 
 ---
 
 ## Target Users
 
-- **Laundry shop owners and staff** - Full admin access for order management
-- **Laundry shop clients** - Order tracking and status inquiry
-- **Walk-in customers** - Service information and order placement
+- **Laundry shop owners and staff** - Full admin access for comprehensive order and customer management
+- **Laundry shop clients** - Self-service order tracking and status inquiry
+- **Walk-in customers** - Service information browsing and pricing details
 
 ---
 
 ## Features
 
-- **Admin Authentication System** - Secure login for staff access
-- **Order Management Interface** - View, delete, and refresh orders with real-time data
-- **Database Integration** - Full CRUD operations with MySQL backend
-- **Professional GUI** - Clean, user-friendly PyQt6 interface with custom styling
-- **Real-time Order Display** - Table view showing order details, dates, and pricing
-- **Window Navigation** - Seamless transitions between main, login, and admin windows
-- **Customer Order Tracking** - Client interface for checking order status
-- **Order Creation System** - Add new orders through GUI forms
-- **Payment Management** - Payment processing and tracking
+### Admin Features
+
+- **Secure Authentication System** - Password-protected admin login
+- **Comprehensive Order Management** - Create, view, update, and delete orders
+- **Real-time Order Tracking** - Monitor order status from pending to completed
+- **Customer Information Management** - Store and manage customer details
+- **Payment Processing** - Track payments with multiple methods (Cash, Card, E-Wallet, Bank Transfer)
+- **Payment Status Management** - Handle pending, partial, paid, failed, and refunded payments
+- **Order Status Workflow** - Manage orders through stages: Pending Payment → Queueing → Washing/Cleaning → Finishing Up → Ready for Pickup → Completed
+- **Auto-refund on Cancellation** - Automatically handle refunds when orders are cancelled
+- **Service Catalog** - View all available services grouped by category
+
+### Customer Features
+
+- **Order Tracking Interface** - Track laundry status using Order ID
+- **Order Details View** - See complete order information including items and pricing
+- **Payment Information** - View payment status and amount paid
+- **Service Price List** - Browse available services and pricing
+
+### System Features
+
+- **Data Validation** - Comprehensive validation for customer info, orders, and payments
+- **Business Logic Enforcement** - Automatic status updates based on payment
+- **Database Integrity** - Cascading deletes and referential integrity
+- **Professional UI** - Clean, modern interface with custom styling
+- **Responsive Design** - Intuitive navigation and user feedback
+
+---
+
+## 🎓 OOP Concepts Applied
+
+### 1. **Encapsulation**
+
+- **Customer Class**: Encapsulates customer data and operations
+
+  ```python
+  class Customer:
+      def __init__(self, customer_id, name, phone, email, address):
+          self.customer_id = customer_id  # Private data
+          self.name = name
+          # ... other attributes
+
+      def save(self):  # Public method
+          # Encapsulates database logic
+
+      def to_dict(self):  # Data transformation
+          # Returns dictionary representation
+  ```
+
+- **Database Connection**: Encapsulates connection management
+  ```python
+  @contextmanager
+  def db_cursor(conn, dictionary=True):
+      cursor = conn.cursor(dictionary=dictionary)
+      try:
+          yield cursor
+      finally:
+          cursor.close()
+  ```
+
+### 2. **Inheritance**
+
+- **Payment Status Hierarchy**: Base class with specialized subclasses
+
+  ```python
+  class PaymentStatus:  # Base class
+      def get_payment_date(self):
+          return None
+
+  class PaidStatus(PaymentStatus):  # Derived class
+      def get_payment_date(self):
+          return datetime.now()  # Override behavior
+
+  class RefundedStatus(PaymentStatus):  # Another derived class
+      def get_amount_paid(self, total_price):
+          return Decimal("0")  # Different behavior
+  ```
+
+### 3. **Polymorphism**
+
+- **Method Overriding**: Different payment statuses have different behaviors
+
+  ```python
+  status = PaymentStatusFactory.create("Paid")
+  payment_date = status.get_payment_date()  # Returns datetime.now()
+
+  status = PaymentStatusFactory.create("Pending")
+  payment_date = status.get_payment_date()  # Returns None
+  ```
+
+- **Interface Consistency**: All status classes implement the same methods but with different logic
+
+### 4. **Abstraction**
+
+- **Validator Classes**: Abstract away complex validation logic
+
+  ```python
+  class OrderValidator:
+      def validate_customer_info(self, name, phone, email, address):
+          # Complex validation hidden from caller
+
+      def validate_order_items(self, items):
+          # Business rules abstracted
+  ```
+
+- **Payment Processor**: Abstracts payment calculations
+  ```python
+  class PaymentProcessor:
+      @staticmethod
+      def calculate_total(order_items):
+          # Calculation logic abstracted
+
+      @staticmethod
+      def determine_payment_status_from_amount(amount_paid, total_price):
+          # Decision logic hidden
+  ```
+
+### 5. **Factory Pattern**
+
+- **PaymentStatusFactory**: Creates appropriate status objects
+  ```python
+  class PaymentStatusFactory:
+      @classmethod
+      def create(cls, status_name):
+          status_key = status_name.lower().strip()
+          status_class = cls._status_map.get(status_key)
+          if status_class:
+              return status_class()
+          return PaymentStatus(status_name)
+  ```
+
+### 6. **Single Responsibility Principle**
+
+- Each class has a single, well-defined purpose:
+  - `Customer` - Manages customer data
+  - `OrderValidator` - Validates order-related data
+  - `PaymentProcessor` - Handles payment calculations
+  - `OrderStatusManager` - Manages order status transitions
+
+### 7. **Composition**
+
+- GUI components composed of multiple parts:
+  ```python
+  class AdminWindow:
+      def __init__(self):
+          self.model = OrdersTableModel()  # Has-a relationship
+          self.table = QTableView()         # Has-a relationship
+          self.validator = OrderValidator() # Has-a relationship
+  ```
 
 ---
 
 ## Database Overview
 
-**Entities:**
+### Database Schema
 
-- `admins`: Admin/staff login credentials and info
-- `customers`: Customer details
-- `orders`: Orders placed, linked to customers
-- `order_items`: Services/add-ons per order
-- `payments`: Payment records per order
-- `categories`: Service categories
-- `services`: Service items and add-ons
-- `order_statuses`: Progress tracking for orders
-- `payment_statuses`: Status of payments
-- `payment_methods`: Modes of payment
+**Core Tables:**
 
-**Entity Relationships Diagram:**
+- **`admin`** - Staff authentication and credentials
+- **`customers`** - Customer personal information
+- **`orders`** - Order records with status and totals
+- **`order_items`** - Individual services per order
+- **`payments`** - Payment transactions and records
 
-```
-[admins]
+**Reference Tables:**
 
+- **`categories`** - Service groupings (Standard, Specialized, Dry Cleaning, Add Ons)
+- **`services`** - Available laundry services with pricing
+- **`order_statuses`** - Order workflow stages
+- **`payment_statuses`** - Payment states (Pending, Partial, Paid, Failed, Refunded)
+- **`payment_methods`** - Payment options (Cash, Card, E-Wallet, Bank Transfer)
 
-[customers]----< [orders] >----[order_statuses]
-       |                        |
-       |                        v
-       |                  [order_items] >----[services]----[categories]
-       |                                                      ^
-       |                                                      |
-       |                                             [payments]----[payment_statuses]
-       |                                                      |
-       |                                                      v
-       |                                      [payment_methods]
-```
+### Service Categories
+
+1. **Standard** - Machine Wash & Dry, Hand Wash & Dry
+2. **Specialized** - Carpet, Comforter, Bedsheets, Stuffed Toys
+3. **Dry Cleaning** - Barong, Blouse, Pants, Jacket, Suits, Gowns
+4. **Add Ons** - Express Service, Delivery, Folding, Pressing, Stain Removal
 
 ---
 
-## 🧩 Class Diagram
-
-```mermaid
-classDiagram
-    %% Database Connection Classes
-    class DatabaseConnection {
-        +get_db_connection() Connection
-        +db_cursor(conn, dictionary) ContextManager
-        +test_connection() bool
-    }
-
-    %% Model Classes
-    class Admin {
-        +admin_id: int
-        +username: string
-        +email: string
-        +password: string
-        +name: string
-        +created_at: datetime
-        +add_admin(username, email, password, created_at, name) int
-        +get_admin_by_id(admin_id) Admin
-        +authenticate_admin(username, password) bool
-        +update_admin(admin_id, **kwargs) bool
-        +delete_admin(admin_id) bool
-    }
-
-    class Customer {
-        +customer_id: int
-        +name: string
-        +contact_number: string
-        +email: string
-        +address: string
-        +created_at: datetime
-        +add_customer(name, contact, email, address) int
-        +get_customer_by_id(customer_id) Customer
-        +get_all_customers() List~Customer~
-        +update_customer(customer_id, **kwargs) bool
-        +delete_customer(customer_id) bool
-        +search_customers(query) List~Customer~
-    }
-
-    class Order {
-        +order_id: int
-        +customer_id: int
-        +order_status_id: int
-        +order_date: datetime
-        +total_price: decimal
-        +estimated_completion: datetime
-        +actual_completion: datetime
-        +notes: string
-        +add_order(customer_id, status_id, date, total) int
-        +get_order_by_id(order_id) Order
-        +get_all_orders() List~Order~
-        +update_order(order_id, **kwargs) bool
-        +delete_order(order_id) bool
-        +get_orders_by_customer(customer_id) List~Order~
-        +get_orders_by_status(status_id) List~Order~
-    }
-
-    class OrderItem {
-        +item_id: int
-        +order_id: int
-        +service_id: int
-        +quantity: int
-        +unit_price: decimal
-        +subtotal: decimal
-        +add_order_item(order_id, service_id, qty, price) int
-        +get_items_by_order(order_id) List~OrderItem~
-        +update_order_item(item_id, **kwargs) bool
-        +delete_order_item(item_id) bool
-        +calculate_subtotal() decimal
-    }
-
-    class Service {
-        +service_id: int
-        +category_id: int
-        +service_name: string
-        +description: string
-        +base_price: decimal
-        +estimated_duration: int
-        +is_active: bool
-        +add_service(category_id, name, desc, price, duration) int
-        +get_service_by_id(service_id) Service
-        +get_services_by_category(category_id) List~Service~
-        +get_all_active_services() List~Service~
-        +update_service(service_id, **kwargs) bool
-        +deactivate_service(service_id) bool
-    }
-
-    class Category {
-        +category_id: int
-        +category_name: string
-        +description: string
-        +is_active: bool
-        +add_category(name, description) int
-        +get_category_by_id(category_id) Category
-        +get_all_active_categories() List~Category~
-        +update_category(category_id, **kwargs) bool
-        +deactivate_category(category_id) bool
-    }
-
-    class OrderStatus {
-        +status_id: int
-        +status_name: string
-        +description: string
-        +is_final: bool
-        +add_status(name, description, is_final) int
-        +get_status_by_id(status_id) OrderStatus
-        +get_all_statuses() List~OrderStatus~
-        +update_status(status_id, **kwargs) bool
-    }
-
-    class Payment {
-        +payment_id: int
-        +order_id: int
-        +payment_method_id: int
-        +payment_status_id: int
-        +amount_paid: decimal
-        +payment_date: datetime
-        +transaction_reference: string
-        +add_payment(order_id, method_id, amount) int
-        +get_payments_by_order(order_id) List~Payment~
-        +update_payment_status(payment_id, status_id) bool
-        +get_payment_by_id(payment_id) Payment
-    }
-
-    class PaymentMethod {
-        +method_id: int
-        +method_name: string
-        +is_active: bool
-        +add_payment_method(name) int
-        +get_all_active_methods() List~PaymentMethod~
-        +update_method(method_id, **kwargs) bool
-    }
-
-    class PaymentStatus {
-        +status_id: int
-        +status_name: string
-        +description: string
-        +add_payment_status(name, description) int
-        +get_all_payment_statuses() List~PaymentStatus~
-    }
-
-    %% GUI Classes
-    class MainWindow {
-        +title: string
-        +geometry: tuple
-        +admin_window: AdminWindow
-        +customer_window: CustomerWindow
-        +initUI() void
-        +show_admin_login() void
-        +show_customer_tracking() void
-        +show_services_info() void
-        +exit_application() void
-    }
-
-    class LoginDialog {
-        +username_field: QLineEdit
-        +password_field: QLineEdit
-        +login_button: QPushButton
-        +cancel_button: QPushButton
-        +initUI() void
-        +validate_credentials() bool
-        +on_login_success() void
-        +on_login_failure() void
-    }
-
-    class AdminWindow {
-        +orders_table: QTableView
-        +customers_table: QTableView
-        +table_model: OrdersTableModel
-        +back_button: QPushButton
-        +refresh_button: QPushButton
-        +add_button: QPushButton
-        +delete_button: QPushButton
-        +initUI() void
-        +load_orders_data() void
-        +refresh_orders() void
-        +add_new_order() void
-        +delete_selected_order() void
-        +show_order_details() void
-        +back_to_main() void
-    }
-
-    class OrdersTableModel {
-        +headers: List~string~
-        +data: List~List~
-        +rowCount(parent) int
-        +columnCount(parent) int
-        +data(index, role) QVariant
-        +headerData(section, orientation, role) QVariant
-        +refresh_data() void
-        +convert_data(raw_data) List~List~
-        +get_order_id(row) int
-    }
-
-    class CustomerWindow {
-        +order_id_field: QLineEdit
-        +search_button: QPushButton
-        +status_display: QLabel
-        +details_table: QTableWidget
-        +initUI() void
-        +search_order() void
-        +display_order_status() void
-        +display_order_details() void
-        +clear_results() void
-    }
-
-    class OrderDialog {
-        +customer_combo: QComboBox
-        +services_list: QListWidget
-        +total_label: QLabel
-        +save_button: QPushButton
-        +cancel_button: QPushButton
-        +selected_services: List~Service~
-        +initUI() void
-        +load_customers() void
-        +load_services() void
-        +add_service_to_order() void
-        +calculate_total() decimal
-        +save_order() bool
-    }
-
-    %% Relationships
-    Customer ||--o{ Order : "places"
-    Order ||--o{ OrderItem : "contains"
-    Order }o--|| OrderStatus : "has"
-    Order ||--o{ Payment : "paid_by"
-
-    OrderItem }o--|| Service : "uses"
-    Service }o--|| Category : "belongs_to"
-
-    Payment }o--|| PaymentMethod : "uses"
-    Payment }o--|| PaymentStatus : "has"
-
-    %% GUI Relationships
-    MainWindow --> LoginDialog : "opens"
-    MainWindow --> AdminWindow : "opens"
-    MainWindow --> CustomerWindow : "opens"
-
-    AdminWindow --> OrdersTableModel : "uses"
-    AdminWindow --> OrderDialog : "opens"
-
-    %% Database Connections (All models use DatabaseConnection)
-    Admin --> DatabaseConnection : "uses"
-    Customer --> DatabaseConnection : "uses"
-    Order --> DatabaseConnection : "uses"
-    OrderItem --> DatabaseConnection : "uses"
-    Service --> DatabaseConnection : "uses"
-    Category --> DatabaseConnection : "uses"
-    OrderStatus --> DatabaseConnection : "uses"
-    Payment --> DatabaseConnection : "uses"
-    PaymentMethod --> DatabaseConnection : "uses"
-    PaymentStatus --> DatabaseConnection : "uses"
-```
-
-## 🧩 Use Case Diagram
-
-```mermaid
-usecaseDiagram
-    actor Admin as A
-    actor Customer as C
-
-    rectangle "La Lavandera: Laundry Monitoring & Services System" {
-        (Login) as UC1
-        (Add Laundry Order) as UC2
-        (Update Laundry Status) as UC3
-        (Update Payment Status) as UC4
-        (View All Orders) as UC5
-        (Delete or Update Orders) as UC6
-        (Track Order Status) as UC7
-        (View Services and Prices) as UC8
-    }
-
-    A --> UC1
-    A --> UC2
-    A --> UC3
-    A --> UC4
-    A --> UC5
-    A --> UC6
-
-    C --> UC7
-    C --> UC8
-
-```
-
-```mermaid
-graph TB
-    %% Actors
-    Admin[👨‍💼 Admin/Staff]
-    Customer[👤 Customer]
-    SystemActor[🖥️ Automated System Functions]
-
-    %% System Boundary
-    subgraph LMS [📚 Library Management System]
-        %% Admin Use Cases
-        UC1[Login to System]
-        UC2[Manage Orders]
-        UC3[Manage Customers]
-        UC4[Process Payments]
-        UC6[Manage Services]
-
-        %% Customer Use Cases
-        UC7[Track Order Status]
-        UC8[View Order Details]
-        UC9[Check Service Prices]
-
-        %% System Use Cases
-        UC11[Calculate Pricing]
-        UC12[Update Order Status]
-        UC13[Backup Data]
-
-        %% Sub Use Cases for Order Management
-        UC2 --> UC2A[Create New Order]
-        UC2 --> UC2B[View All Orders]
-        UC2 --> UC2C[Update Order Status]
-        UC2 --> UC2D[Delete Order]
-        UC2 --> UC2E[Search Orders]
-
-        %% Sub Use Cases for Customer Management
-        UC3 --> UC3A[Add New Customer]
-        UC3 --> UC3B[View Customer Details]
-        UC3 --> UC3C[Update Customer Info]
-        UC3 --> UC3D[Search Customers]
-
-        %% Sub Use Case for Payment Processing
-        UC4 --> UC4D[Generate Receipt]
-
-        %% Include Relation Example
-        UC2A -->|includes| UC4D
-    end
-
-    %% Connections
-    Admin --> UC1
-    Admin --> UC2
-    Admin --> UC3
-    Admin --> UC4
-    Admin --> UC6
-
-    Customer --> UC7
-    Customer --> UC8
-    Customer --> UC9
-
-    SystemActor --> UC11
-    SystemActor --> UC12
-    SystemActor --> UC13
-```
-
-## 🔄 Sequence Diagram – Add Order Flow
-
-```mermaid
-sequenceDiagram
-    participant A as Admin
-    participant GUI as AdminWindow
-    participant ODlg as OrderDialog
-    participant OM as OrderModel
-    participant CM as CustomerModel
-    participant SM as ServiceModel
-    participant DB as Database
-
-    A->>GUI: Click "Add Order"
-    GUI->>ODlg: Open OrderDialog()
-
-    ODlg->>CM: get_all_customers()
-    CM->>DB: SELECT * FROM customers
-    DB-->>CM: Customer data
-    CM-->>ODlg: List[Customer]
-
-    ODlg->>SM: get_all_active_services()
-    SM->>DB: SELECT * FROM services WHERE is_active=1
-    DB-->>SM: Service data
-    SM-->>ODlg: List[Service]
-
-    ODlg-->>A: Show dialog with customers and services
-
-    A->>ODlg: Select customer and services
-    ODlg->>ODlg: calculate_total()
-    ODlg-->>A: Show calculated total
-
-    A->>ODlg: Click "Save Order"
-    ODlg->>OM: add_order(customer_id, services, total)
-    OM->>DB: INSERT INTO orders (...)
-    DB-->>OM: order_id
-
-    loop For each service
-        OM->>DB: INSERT INTO order_items (...)
-    end
-
-    OM-->>ODlg: Order created successfully
-    ODlg-->>GUI: Close dialog, refresh needed
-    GUI->>GUI: refresh_orders()
-    GUI-->>A: Updated orders list
-```
-
-## 🗃️ Entity–Relationship Diagram
+## ðŸ—ƒï¸ Entity-Relationship Diagram
 
 ```mermaid
 erDiagram
-    ADMINS {
+    ADMIN {
         int admin_id PK
         varchar username UK
-        varchar email
         varchar password
         varchar name
+        varchar email
         datetime created_at
     }
 
     CUSTOMERS {
         int customer_id PK
-        varchar name
-        varchar contact_number
-        varchar email UK
-        varchar address
-        datetime created_at
+        varchar customer_name
+        varchar customer_phone
+        varchar customer_email
+        varchar customer_address
     }
 
     ORDERS {
@@ -491,42 +236,34 @@ erDiagram
         int order_status_id FK
         datetime order_date
         decimal total_price
-        datetime estimated_completion
-        datetime actual_completion
-        text notes
     }
 
     ORDER_ITEMS {
-        int item_id PK
+        int order_item_id PK
         int order_id FK
         int service_id FK
         int quantity
-        decimal unit_price
-        decimal subtotal
+        decimal price
     }
 
     SERVICES {
         int service_id PK
         int category_id FK
         varchar service_name
-        text description
-        decimal base_price
-        int estimated_duration
-        boolean is_active
+        decimal min_price
+        decimal max_price
+        varchar price_unit
+        text service_notes
     }
 
     CATEGORIES {
         int category_id PK
-        varchar category_name UK
-        text description
-        boolean is_active
+        varchar category_name
     }
 
     ORDER_STATUSES {
-        int status_id PK
-        varchar status_name UK
-        text description
-        boolean is_final
+        int order_status_id PK
+        varchar order_status_name
     }
 
     PAYMENTS {
@@ -536,22 +273,18 @@ erDiagram
         int payment_status_id FK
         decimal amount_paid
         datetime payment_date
-        varchar transaction_reference
     }
 
     PAYMENT_METHODS {
-        int method_id PK
-        varchar method_name UK
-        boolean is_active
+        int payment_method_id PK
+        varchar payment_method_name
     }
 
     PAYMENT_STATUSES {
-        int status_id PK
-        varchar status_name UK
-        text description
+        int payment_status_id PK
+        varchar payment_status_name
     }
 
-    %% Relationships
     CUSTOMERS ||--o{ ORDERS : "places"
     ORDERS ||--o{ ORDER_ITEMS : "contains"
     ORDERS }o--|| ORDER_STATUSES : "has"
@@ -564,68 +297,337 @@ erDiagram
     PAYMENTS }o--|| PAYMENT_STATUSES : "has"
 ```
 
-## Technologies Used
+---
 
-- **Python 3.8+** - Core application development
-- **PyQt6** - Modern desktop GUI framework
-- **MySQL** - Database management (via XAMPP)
-- **mysql-connector-python** - Database connectivity
-- **VS Code** - Development environment with Python extensions
+## ðŸ"„ Sequence Diagram – Add Order Flow
+
+```mermaid
+sequenceDiagram
+    participant Admin
+    participant AdminWindow
+    participant OrderDialog
+    participant Validator
+    participant Database
+
+    Admin->>AdminWindow: Click "Add Order"
+    AdminWindow->>OrderDialog: Open AddOrderDialog()
+
+    OrderDialog->>Database: Load customers
+    Database-->>OrderDialog: Customer list
+
+    OrderDialog->>Database: Load services
+    Database-->>OrderDialog: Service list with categories
+
+    OrderDialog-->>Admin: Display form
+
+    Admin->>OrderDialog: Fill customer info
+    Admin->>OrderDialog: Select services & quantities
+    OrderDialog->>OrderDialog: Calculate total price
+
+    Admin->>OrderDialog: Enter payment details
+    OrderDialog->>OrderDialog: Auto-determine payment status
+
+    Admin->>OrderDialog: Click "Add Order"
+
+    OrderDialog->>Validator: validate_customer_info()
+    Validator-->>OrderDialog: Valid
+
+    OrderDialog->>Validator: validate_order_items()
+    Validator-->>OrderDialog: Valid
+
+    OrderDialog->>Validator: validate_payment()
+    Validator-->>OrderDialog: Valid
+
+    OrderDialog->>Database: INSERT customer
+    Database-->>OrderDialog: customer_id
+
+    OrderDialog->>Database: INSERT order
+    Database-->>OrderDialog: order_id
+
+    loop For each service
+        OrderDialog->>Database: INSERT order_item
+    end
+
+    OrderDialog->>Database: INSERT payment
+
+    OrderDialog-->>AdminWindow: Success
+    AdminWindow->>AdminWindow: Refresh orders list
+    AdminWindow-->>Admin: Show updated orders
+```
 
 ---
 
-## 📁 Current Project Structure
+## Technologies Used
+
+- **Python 3.8+** - Core application development and business logic
+- **PyQt6** - Modern cross-platform GUI framework
+- **MySQL 8.0** - Relational database management system
+- **mysql-connector-python** - Python MySQL database adapter
+- **XAMPP** - Local development environment (Apache + MySQL)
+- **Decimal** - Precise monetary calculations
+
+---
+
+## ðŸ" Project Structure
 
 ```
 LaundrySystem/
-├── src/
-│   ├── db/                              # 🗄️ Database Layer
-│   │   ├── __init__.py                  # Package marker
-│   │   └── connection.py                # Database connection & cursor management
-│   │
-│   ├── models/                          # 📊 Business Logic Layer
-│   │   ├── __init__.py                  # Package marker
-│   │   ├── admin.py                     # Admin authentication & management
-│   │   ├── customer.py                  # Customer data operations
-│   │   ├── order.py                     # Order CRUD operations
-│   │   ├── order_item.py               # Order items management
-│   │   ├── service.py                  # Service catalog management
-│   │   ├── category.py                 # Service categories
-│   │   ├── payment.py                  # Payment processing
-│   │   └── status.py                   # Order & payment status tracking
-│   │
-│   ├── gui/                            # 🖥️ User Interface Layer
-│   │   ├── __init__.py                 # Package marker
-│   │   ├── main_window.py              # Main application window & navigation
-│   │   ├── login_page.py               # Admin authentication dialog
-│   │   ├── admin_page.py               # Order management interface
-│   │   ├── customer_window.py          # Customer order tracking (planned)
-│   │   ├── order_dialog.py             # Add/Edit order forms (planned)
-│   │   ├── a_logo.png                  # Application icon
-│   │   └── a_main_logo.png             # Main logo image
-│   │
-│   └── tests/                          # 🧪 Testing & Verification
-│       ├── __init__.py                 # Package marker
-│       ├── test_db_connection.py       # Database connectivity tests
-│       ├── verify_order.py             # Order functionality verification
-│       ├── test_orders.py              # Order data validation
-│       └── test_models.py              # Model unit tests (planned)
-│
-├── .venv/                              # Virtual environment
-│   └── Lib/site-packages/
-│       └── laundry_src.pth             # Python path configuration
-│
-├── .env                                # Environment variables
-├── .gitignore                          # Git ignore rules
-└── README.md                           # Project documentation
+â"œâ"€â"€ src/
+â"‚   â"œâ"€â"€ db/                              # ðŸ—„ï¸ Database Layer
+â"‚   â"‚   â"œâ"€â"€ __init__.py                  # Package marker
+â"‚   â"‚   â"œâ"€â"€ connection.py                # Database connection & context manager
+â"‚   â"‚   â""â"€â"€ db_laundry.sql               # Database schema & initial data
+â"‚   â"‚
+â"‚   â"œâ"€â"€ models/                          # ðŸ"Š Business Logic & Data Layer
+â"‚   â"‚   â"œâ"€â"€ __init__.py                  # Package marker
+â"‚   â"‚   â"œâ"€â"€ admin.py                     # Admin authentication CRUD
+â"‚   â"‚   â"œâ"€â"€ customer_class.py            # Customer class with OOP methods
+â"‚   â"‚   â"œâ"€â"€ order.py                     # Order CRUD operations
+â"‚   â"‚   â"œâ"€â"€ order_item.py                # Order items management
+â"‚   â"‚   â"œâ"€â"€ order_status.py              # Order status CRUD
+â"‚   â"‚   â"œâ"€â"€ order_validator.py           # Business logic validators (OOP)
+â"‚   â"‚   â"œâ"€â"€ service.py                   # Service catalog CRUD
+â"‚   â"‚   â"œâ"€â"€ category.py                  # Service categories CRUD
+â"‚   â"‚   â"œâ"€â"€ payment.py                   # Payment CRUD operations
+â"‚   â"‚   â"œâ"€â"€ payment_method.py            # Payment methods CRUD
+â"‚   â"‚   â"œâ"€â"€ payment_status.py            # Payment status CRUD
+â"‚   â"‚   â""â"€â"€ status_factory.py            # Factory pattern for payment status (OOP)
+â"‚   â"‚
+â"‚   â""â"€â"€ gui/                             # ðŸ–¥ï¸ User Interface Layer
+â"‚       â"œâ"€â"€ __init__.py                  # Package marker
+â"‚       â"œâ"€â"€ main_window.py               # Main application window & entry point
+â"‚       â"œâ"€â"€ login_page.py                # Admin authentication dialog
+â"‚       â"œâ"€â"€ admin_page.py                # Order management interface (main admin view)
+â"‚       â"œâ"€â"€ order_form_page.py           # Add/Edit order dialog with validation
+â"‚       â"œâ"€â"€ track_order_page.py          # Customer order tracking interface
+â"‚       â"œâ"€â"€ services_page.py             # Service catalog display
+â"‚       â"œâ"€â"€ a_logo.png                   # Application icon (16x16, 32x32)
+â"‚       â""â"€â"€ a_main_logo.png              # Main logo banner image
+â"‚
+â"œâ"€â"€ .gitignore                           # Git ignore rules
+â""â"€â"€ README.md                            # Project documentation
 ```
 
 ---
 
-## Screenshots
+## Installation & Setup
+
+### Prerequisites
+
+1. **Python 3.8 or higher**
+
+   - Download from [python.org](https://www.python.org/downloads/)
+   - Ensure "Add Python to PATH" is checked during installation
+
+2. **XAMPP**
+   - Download from [apachefriends.org](https://www.apachefriends.org/)
+   - Install and start MySQL service
+
+### Step 1: Clone or Download Project
+
+```bash
+# Clone repository (if using Git)
+git clone https://github.com/yourusername/laundry-system.git
+cd laundry-system
+
+# Or download and extract ZIP file
+```
+
+### Step 2: Install Python Dependencies
+
+```bash
+# Create virtual environment (recommended)
+python -m venv venv
+
+# Activate virtual environment
+# Windows:
+venv\Scripts\activate
+# macOS/Linux:
+source venv/bin/activate
+
+# Install required packages
+pip install PyQt6 mysql-connector-python
+```
+
+### Step 3: Setup Database
+
+1. **Start XAMPP** and ensure MySQL is running
+2. **Open phpMyAdmin** (http://localhost/phpmyadmin)
+3. **Import Database:**
+
+   - Click "New" to create database named `db_laundry`
+   - Select `db_laundry` database
+   - Click "Import" tab
+   - Choose file: `src/db/db_laundry.sql`
+   - Click "Go" to import
+
+4. **Verify Admin Account:**
+   - Navigate to `admin` table
+   - Ensure at least one admin record exists
+   - Default credentials should be in the database
+
+### Step 4: Run Application
+
+```bash
+# Navigate to project directory
+cd LaundrySystem
+
+# Run main application
+python src/gui/main_window.py
+```
+
+---
+
+## Usage Guide
+
+### For Administrators
+
+1. **Login:**
+
+   - Launch application
+   - Click "Admin Log In" button
+   - Enter credentials (username: `labandera`, password: `labandera_admin`)
+
+2. **Add New Order:**
+
+   - Click "Add Order" button
+   - Fill in customer information
+   - Select services and quantities
+   - Adjust prices if needed (within min-max range)
+   - Enter payment details
+   - Click "Add Order" to save
+
+3. **Manage Orders:**
+
+   - View all orders in the main table
+   - Click on an order to view details in side panels
+   - Update payment status from dropdown
+   - Update order status through workflow
+   - Delete orders using "Delete Order" button
+
+4. **Payment Management:**
+
+   - Edit amount paid directly in the detail panel
+   - System auto-determines payment status (Pending/Partial/Paid)
+   - Payment status can be manually adjusted if needed
+   - Completed payments automatically update order status
+
+5. **Order Status Workflow:**
+   - Pending Payment → Queueing (auto when paid)
+   - Queueing → Washing/Cleaning
+   - Washing/Cleaning → Finishing Up
+   - Finishing Up → Ready for Pickup/Delivery
+   - Ready for Pickup/Delivery → Completed
+   - Any status → Cancelled (triggers auto-refund)
+
+### For Customers
+
+1. **Track Order:**
+
+   - Enter Order ID in search box on main page
+   - Click search button
+   - View order status and details
+
+2. **View Services:**
+   - Click "Services" button
+   - Browse available services by category
+   - View pricing ranges
+
+---
+
+## Business Rules & Validation
+
+### Payment Validation
+
+- Amount paid cannot be negative
+- "Paid" status requires full payment
+- Partial payment automatically sets "Partial" status
+- Zero payment sets "Pending" status
+
+### Order Status Rules
+
+- Orders cannot progress without payment started
+- "Completed" requires full payment
+- "Cancelled" triggers automatic refund
+- Status transitions follow logical workflow
+
+### Order Item Validation
+
+- At least one service must be selected
+- Quantities must be positive
+- Prices must be within service min-max range
+
+### Customer Validation
+
+- Name and contact number are required
+- Email format validation (if provided)
+
+---
+
+## Features Highlight
+
+### Automatic Business Logic
+
+- **Auto Payment Status**: System determines status based on amount paid
+- **Auto Order Status**: Payment completion triggers order status update
+- **Auto Refund**: Cancellation automatically sets payment to ₱0 and "Refunded"
+- **Auto Date Tracking**: Payment date recorded when fully paid
+
+### Data Integrity
+
+- **Cascading Deletes**: Deleting order removes items and payments
+- **Customer Cleanup**: Customers deleted when no orders remain
+- **Referential Integrity**: Foreign keys maintain data consistency
+
+### User Experience
+
+- **Confirmation Dialogs**: Critical actions require confirmation
+- **Real-time Updates**: Changes reflect immediately in interface
+- **Visual Feedback**: Status-based colors and formatting
+- **Input Validation**: Prevents invalid data entry
+
+---
+
+## Known Limitations
+
+1. **Password Security**: Passwords stored in plain text (academic project)
+2. **Single Admin Session**: No multi-user concurrent access handling
+3. **No Backup Feature**: Manual database backup required
+4. **Local Database**: Requires local MySQL server
+
+---
+
+## Future Enhancements
+
+- Password hashing for security
+- SMS/Email notifications for order status
+- Reporting and analytics dashboard
+- Inventory management integration
+- Mobile application for customers
+- Cloud database support
+- Multi-branch management
+
+---
+
+## Credits & References
+
+- **PyQt6 Documentation**: https://www.riverbankcomputing.com/static/Docs/PyQt6/
+- **MySQL Documentation**: https://dev.mysql.com/doc/
+- **Python MySQL Connector**: https://dev.mysql.com/doc/connector-python/
+
+---
+
+## License
+
+This project is developed for academic purposes as part of IT5 course requirement.
 
 ---
 
 ## Author
 
-Arianne Danielle V. Añora
+**Arianne Danielle V. Añora**  
+BS Information Technology
+University of Mindanao  
+Date: October 2025
+
+_Last Updated: October 15, 2025_

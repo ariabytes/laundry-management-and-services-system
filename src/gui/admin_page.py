@@ -3,7 +3,7 @@ import sys
 from datetime import datetime
 from decimal import Decimal
 from models.order import get_all_orders, delete_order, update_order, add_order
-from models.customer import get_customer_by_id, get_all_customers, update_customer, add_customer
+from models.customer_class import get_customer_by_id, get_all_customers, update_customer, add_customer
 from models.order_status import get_order_status_by_id, get_all_order_statuses, update_order_status
 from models.order_item import get_order_items_by_order, update_order_item, delete_order_item, add_order_item
 from models.payment import get_payments_by_order, update_payment, add_payment
@@ -12,6 +12,9 @@ from models.payment_method import get_all_payment_methods
 from models.payment_status import get_all_payment_statuses
 from models.category import get_all_categories
 from gui.order_form_page import AddOrderDialog
+
+from models.status_factory import PaymentStatusFactory
+from models.order_validator import PaymentProcessor, OrderValidator, OrderStatusManager, PaymentStatusValidator
 
 from PyQt6.QtGui import QIcon, QPixmap
 from PyQt6.QtCore import Qt, pyqtSignal, QAbstractTableModel, QModelIndex
@@ -216,11 +219,9 @@ class AdminWindow(QMainWindow):
         self.setWindowIcon(QIcon("src/gui/a_logo.png"))
         self.setStyleSheet("background-color: #f9f9f9;")
 
-        # Current selected order
         self.current_order_id = None
         self.is_deleting = False
 
-        # Get orders
         try:
             orders_data = get_all_orders()
             print(f"✅ Loaded {len(orders_data)} orders from database")
@@ -230,18 +231,14 @@ class AdminWindow(QMainWindow):
             traceback.print_exc()
             orders_data = []
 
-        # Table model + view
         self.model = OrdersTableModel(orders_data)
-        # Connect status update signal
         self.model.status_updated.connect(self.show_status_update_notification)
         self.table = QTableView()
         self.table.setModel(self.model)
         self.table.verticalHeader().setDefaultSectionSize(35)
 
-        # Connect selection changed signal
         self.table.selectionModel().selectionChanged.connect(self.on_selection_changed)
 
-        # Configure table (removed status delegate - no editing in table anymore)
         self.table.setAlternatingRowColors(True)
         self.table.setSelectionBehavior(
             QTableView.SelectionBehavior.SelectRows)
@@ -281,14 +278,10 @@ class AdminWindow(QMainWindow):
         self.initUI()
         self.showMaximized()
 
-    # Show a notification when order status is updated (only if not deleting)
     def show_status_update_notification(self, old_status, new_status):
         if not self.is_deleting:
             QMessageBox.information(
-                self,
-                "Status Updated",
-                f"Order status successfully changed from '{old_status}' to '{new_status}'!"
-            )
+                self, "Status Updated", f"Order status successfully changed from '{old_status}' to '{new_status}'!")
 
     def initUI(self):
         central_widget = QWidget()
@@ -324,9 +317,7 @@ class AdminWindow(QMainWindow):
         pixmap = QPixmap("src/gui/a_main_logo.png")
         desired_height = 50
         scaled_pixmap = pixmap.scaledToHeight(
-            desired_height,
-            Qt.TransformationMode.SmoothTransformation
-        )
+            desired_height, Qt.TransformationMode.SmoothTransformation)
         logo_label.setPixmap(scaled_pixmap)
         logo_label.setFixedHeight(desired_height)
         top_bar.addWidget(logo_label)
@@ -795,10 +786,8 @@ class AdminWindow(QMainWindow):
         if self.is_deleting:
             return
 
-        # Get the new value from the spinbox
         value = self.amount_paid_input.value()
 
-        # Compare with the current database value before prompting
         try:
             payments = get_payments_by_order(self.current_order_id)
             if not payments:
@@ -812,31 +801,92 @@ class AdminWindow(QMainWindow):
         if abs(value - old_value) < 0.01:
             return
 
-        # Ask for confirmation
-        confirm = QMessageBox.question(self, "Confirm Payment Update",
-                                       f"Update amount paid to ₱{value:.2f}?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+        current_row = self.table.selectionModel().selectedRows()[0].row(
+        ) if self.table.selectionModel().selectedRows() else None
+        if current_row is None:
+            return
+
+        order_data = self.model.get_order_data(current_row)
+        total_price = float(order_data.get('total_price', 0))
+
+        from models.order_validator import PaymentStatusValidator
+        suggested_status = PaymentStatusValidator.auto_determine_payment_status(
+            value, total_price)
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Payment Update",
+            f"Update amount paid to ₱{value:.2f}?\n\n" +
+            f"Payment status will be automatically set to: {suggested_status}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
 
         if confirm != QMessageBox.StandardButton.Yes:
-            # revert to old value
             self.amount_paid_input.blockSignals(True)
             self.amount_paid_input.setValue(old_value)
             self.amount_paid_input.blockSignals(False)
             return
 
-        # proceed with update
         try:
             payment_id = payment.get('payment_id')
+
+            from models.payment_status import get_all_payment_statuses
+            all_statuses = get_all_payment_statuses()
+            new_status_id = None
+            for status in all_statuses:
+                if status['payment_status_name'].lower().strip() == suggested_status.lower():
+                    new_status_id = status['payment_status_id']
+                    break
+
+            if new_status_id is None:
+                new_status_id = payment.get('payment_status_id')
+
+            from models.status_factory import PaymentStatusFactory
+            status_obj = PaymentStatusFactory.create(suggested_status)
+            payment_date = status_obj.get_payment_date()
+
+            # Only finalize payment date when fully paid
+            if suggested_status.lower() == "paid":
+                payment_date = datetime.now()
+            else:
+                payment_date = None
+
             success = update_payment(
                 payment_id,
                 self.current_order_id,
                 Decimal(str(value)),
-                payment.get('payment_date'),
+                payment_date,
                 payment.get('payment_method_id'),
-                payment.get('payment_status_id')
+                new_status_id
             )
 
             if success:
-                print(f"✅ Amount paid updated to ₱{value:.2f}")
+                # Update UI to reflect new status
+                self.payment_status_combo.blockSignals(True)
+                for i in range(self.payment_status_combo.count()):
+                    if self.payment_status_combo.itemData(i) == new_status_id:
+                        self.payment_status_combo.setCurrentIndex(i)
+                        break
+                self.payment_status_combo.blockSignals(False)
+
+                if payment_date:
+                    if isinstance(payment_date, datetime):
+                        self.payment_date_label.setText(
+                            payment_date.strftime('%Y-%m-%d %H:%M:%S'))
+                    else:
+                        self.payment_date_label.setText(str(payment_date))
+                else:
+                    self.payment_date_label.setText("-")
+
+                if suggested_status.lower() == "paid":
+                    self.auto_update_order_status_to_queueing()
+
+                self.model.update_data(get_all_orders())
+                if current_row is not None:
+                    self.table.selectRow(current_row)
+
+                print(
+                    f"✅ Amount paid updated to ₱{value:.2f}, status set to {suggested_status}")
             else:
                 print("❌ Failed to update amount paid")
                 QMessageBox.warning(
@@ -905,13 +955,58 @@ class AdminWindow(QMainWindow):
         if not self.current_order_id or index < 0:
             return
 
-        # Don't show popup during deletion
         if self.is_deleting:
             return
 
         status_name = self.payment_status_combo.currentText()
-        confirm = QMessageBox.question(self, "Confirm Payment Status Update",
-                                       f"Change payment status to '{status_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+        current_row = self.table.selectionModel().selectedRows()[0].row(
+        ) if self.table.selectionModel().selectedRows() else None
+        if current_row is None:
+            return
+
+        order_data = self.model.get_order_data(current_row)
+        total_price = float(order_data.get('total_price', 0))
+
+        try:
+            payments = get_payments_by_order(self.current_order_id)
+            if not payments:
+                return
+
+            payment = payments[0]
+            amount_paid = float(payment.get('amount_paid', 0))
+
+            from models.order_validator import PaymentStatusValidator
+            is_valid, error_msg, suggested_status = PaymentStatusValidator.validate_payment_status_change(
+                status_name,
+                amount_paid,
+                total_price
+            )
+
+            if not is_valid:
+                QMessageBox.warning(
+                    self,
+                    "Invalid Payment Status",
+                    f"{error_msg}\n\nSuggested status: {suggested_status.title()}"
+                )
+                status_id = payment.get('payment_status_id')
+                self.payment_status_combo.blockSignals(True)
+                for i in range(self.payment_status_combo.count()):
+                    if self.payment_status_combo.itemData(i) == status_id:
+                        self.payment_status_combo.setCurrentIndex(i)
+                        break
+                self.payment_status_combo.blockSignals(False)
+                return
+
+        except Exception as e:
+            print(f"Error validating payment status: {e}")
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Payment Status Update",
+            f"Change payment status to '{status_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
 
         if confirm != QMessageBox.StandardButton.Yes:
             try:
@@ -929,9 +1024,6 @@ class AdminWindow(QMainWindow):
                 print(f"Error reverting payment status: {e}")
             return
 
-        current_row = self.table.selectionModel().selectedRows()[0].row(
-        ) if self.table.selectionModel().selectedRows() else None
-
         try:
             payments = get_payments_by_order(self.current_order_id)
             if payments and len(payments) > 0:
@@ -939,27 +1031,15 @@ class AdminWindow(QMainWindow):
                 payment_id = payment.get('payment_id')
                 status_id = self.payment_status_combo.itemData(index)
 
-                # Get order data for total price
-                order_data = self.model.get_order_data(current_row)
-                total_price = order_data.get('total_price', 0)
-                if isinstance(total_price, Decimal):
-                    total_price = float(total_price)
+                status = PaymentStatusFactory.create(status_name)
+                payment_date = status.get_payment_date()
 
-                # Auto-set values based on status
-                status_text = status_name.lower().strip()
-
-                if status_text == "paid":
+                if status_name.lower().strip() == "paid":
+                    amount_paid = status.get_amount_paid(total_price)
                     payment_date = datetime.now()
-                    amount_paid = Decimal(str(total_price))
-                elif status_text in ["pending", "unpaid", "cancelled"]:
-                    payment_date = None
-                    amount_paid = payment.get('amount_paid')
-                elif status_text == "refunded":
-                    payment_date = None
-                    amount_paid = Decimal('0')
                 else:
-                    payment_date = payment.get('payment_date')
                     amount_paid = payment.get('amount_paid')
+                    payment_date = None
 
                 success = update_payment(
                     payment_id,
@@ -981,7 +1061,7 @@ class AdminWindow(QMainWindow):
                     self.amount_paid_input.setValue(float(amount_paid))
                     self.amount_paid_input.blockSignals(False)
 
-                    if status_text == "paid":
+                    if status_name.lower().strip() == "paid":
                         self.auto_update_order_status_to_queueing()
 
                     self.model.update_data(get_all_orders())
@@ -1012,7 +1092,6 @@ class AdminWindow(QMainWindow):
                         self.order_status_combo.setCurrentIndex(i)
                         self.order_status_combo.blockSignals(False)
 
-                        # Update database
                         current_row = self.table.selectionModel().selectedRows()[0].row(
                         ) if self.table.selectionModel().selectedRows() else None
                         order_data = self.model.get_order_data(current_row)
@@ -1021,7 +1100,6 @@ class AdminWindow(QMainWindow):
                         update_order(
                             self.current_order_id, order_data["customer_id"], status_id, order_data["order_date"], order_data["total_price"])
 
-                        # Update table display and reselect
                         self.model.update_data(get_all_orders())
                         if current_row is not None:
                             self.table.selectRow(current_row)
@@ -1031,6 +1109,24 @@ class AdminWindow(QMainWindow):
         except Exception as e:
             print(f"Error auto-updating order status: {e}")
 
+    def update_payment_status_display_color(self):
+        """Update payment status display with color based on status"""
+        status_name = self.payment_status_combo.currentText()
+        status = PaymentStatusFactory.create(status_name)
+        color = status.get_display_color()
+
+        self.payment_status_combo.setStyleSheet(f"""
+            QComboBox {{
+                background-color: transparent;
+                border: 2px solid {color};
+                border-radius: 5px;
+                padding: 5px;
+                font-size: 13px;
+                font-weight: bold;
+                color: {color};
+            }}
+        """)
+
     def on_order_status_changed(self, index):
         if not self.current_order_id or index < 0:
             return
@@ -1039,32 +1135,83 @@ class AdminWindow(QMainWindow):
             return
 
         status_name = self.order_status_combo.currentText()
-        confirm = QMessageBox.question(self, "Confirm Order Status Update",
-                                       f"Change order status to '{status_name}'?", QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+
+        current_row = self.table.selectionModel().selectedRows()[0].row(
+        ) if self.table.selectionModel().selectedRows() else None
+        if current_row is None:
+            return
+
+        order_data = self.model.get_order_data(current_row)
+
+        try:
+            payments = get_payments_by_order(self.current_order_id)
+            if not payments:
+                QMessageBox.warning(
+                    self, "Error", "No payment information found for this order")
+                return
+
+            payment = payments[0]
+            amount_paid = float(payment.get('amount_paid', 0))
+            total_price = float(order_data.get('total_price', 0))
+
+            from models.payment_status import get_payment_status_by_id
+            payment_status_data = get_payment_status_by_id(
+                payment.get('payment_status_id'))
+            payment_status_name = payment_status_data.get(
+                'payment_status_name', 'Unknown') if payment_status_data else 'Unknown'
+
+            current_order_status_data = get_order_status_by_id(
+                order_data.get('order_status_id'))
+            current_order_status_name = current_order_status_data.get(
+                'order_status_name', 'Unknown') if current_order_status_data else 'Unknown'
+
+            is_valid, error_msg = OrderStatusManager.validate_transition_with_payment(
+                current_order_status_name,
+                status_name,
+                payment_status_name,
+                amount_paid,
+                total_price
+            )
+
+            if not is_valid:
+                QMessageBox.warning(self, "Invalid Status Change", error_msg)
+                # Revert to original value
+                self.order_status_combo.blockSignals(True)
+                order_status_id = order_data.get('order_status_id')
+                for i in range(self.order_status_combo.count()):
+                    if self.order_status_combo.itemData(i) == order_status_id:
+                        self.order_status_combo.setCurrentIndex(i)
+                        break
+                self.order_status_combo.blockSignals(False)
+                return
+
+        except Exception as e:
+            print(f"Error validating status change: {e}")
+            QMessageBox.critical(
+                self, "Error", f"Error validating status change:\n{e}")
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            "Confirm Order Status Update",
+            f"Change order status to '{status_name}'?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
 
         if confirm != QMessageBox.StandardButton.Yes:
             try:
-                # Revert to original value
-                row = self.table.selectionModel().selectedRows()[0].row(
-                ) if self.table.selectionModel().selectedRows() else None
-                if row is not None:
-                    order_data = self.model.get_order_data(row)
-                    order_status_id = order_data.get('order_status_id')
-                    self.order_status_combo.blockSignals(True)
-                    for i in range(self.order_status_combo.count()):
-                        if self.order_status_combo.itemData(i) == order_status_id:
-                            self.order_status_combo.setCurrentIndex(i)
-                            break
-                    self.order_status_combo.blockSignals(False)
+                order_status_id = order_data.get('order_status_id')
+                self.order_status_combo.blockSignals(True)
+                for i in range(self.order_status_combo.count()):
+                    if self.order_status_combo.itemData(i) == order_status_id:
+                        self.order_status_combo.setCurrentIndex(i)
+                        break
+                self.order_status_combo.blockSignals(False)
             except Exception as e:
                 print(f"Error reverting order status: {e}")
             return
 
-        current_row = self.table.selectionModel().selectedRows()[0].row(
-        ) if self.table.selectionModel().selectedRows() else None
-
         try:
-            order_data = self.model.get_order_data(current_row)
             status_id = self.order_status_combo.itemData(index)
 
             success = update_order(
@@ -1103,7 +1250,6 @@ class AdminWindow(QMainWindow):
                 payment = payments[0]
                 payment_id = payment.get('payment_id')
 
-                # Find "Refunded" status
                 refunded_status_id = None
                 for i in range(self.payment_status_combo.count()):
                     if self.payment_status_combo.itemText(i).lower().strip() == "refunded":
@@ -1116,7 +1262,6 @@ class AdminWindow(QMainWindow):
                         '0'), None, payment.get('payment_method_id'), refunded_status_id)
 
                     if success:
-                        # Update UI
                         self.amount_paid_input.blockSignals(True)
                         self.amount_paid_input.setValue(0)
                         self.amount_paid_input.blockSignals(False)
@@ -1168,29 +1313,24 @@ class AdminWindow(QMainWindow):
         if confirm != QMessageBox.StandardButton.Yes:
             return
 
-        # Set flag to suppress notifications during deletion
         self.is_deleting = True
 
         try:
-            # Delete payments
             from models.payment import get_payments_by_order, delete_payment
             payments = get_payments_by_order(order_id)
             for p in payments:
                 delete_payment(p["payment_id"])
 
-            # Delete order items
             from models.order_item import get_order_items_by_order, delete_order_item
             order_items = get_order_items_by_order(order_id)
             for item in order_items:
                 delete_order_item(item["order_item_id"])
 
-            # Delete order itself
             success = delete_order(order_id)
 
-            # Delete customer if they have no other orders
             if customer_id:
                 from models.order import get_all_orders
-                from models.customer import delete_customer
+                from models.customer_class import delete_customer
                 remaining_orders = [
                     o for o in get_all_orders() if o["customer_id"] == customer_id]
                 if len(remaining_orders) == 0:

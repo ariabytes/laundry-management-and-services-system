@@ -1,7 +1,7 @@
 from models.order_status import get_all_order_statuses
 from models.category import get_all_categories
 from models.service import get_all_services
-from models.customer import get_all_customers, add_customer
+from models.customer_class import get_all_customers, add_customer
 import sys
 import os
 # Add the project root to Python path
@@ -68,7 +68,7 @@ def test_models():
             print(f"✅ Successfully added test customer with ID: {customer_id}")
 
             # Clean up - delete the test customer
-            from src.models.customer import delete_customer
+            from models.customer_class import delete_customer
             if delete_customer(customer_id):
                 print("✅ Test customer cleaned up successfully")
         else:
