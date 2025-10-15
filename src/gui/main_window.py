@@ -14,7 +14,7 @@ class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("La Lavandera")
-        self.admin_win = None  # Will hold the admin page instance
+        self.admin_win = None
         self.setWindowIcon(QIcon("src/gui/a_logo.png"))
 
         self.setStyleSheet("background-color: #f9f9f9;")
@@ -92,10 +92,10 @@ class MainWindow(QMainWindow):
         main_vbox = QVBoxLayout()
         main_vbox.addStretch(1)
 
-        # Horizontal layout for search bar + button
+        # Horizontal layout for search bar & button
         search_hbox = QHBoxLayout()
-        search_hbox.setSpacing(0)                     # remove gap
-        search_hbox.setContentsMargins(0, 0, 0, 0)    # remove margins
+        search_hbox.setSpacing(0)
+        search_hbox.setContentsMargins(0, 0, 0, 0)
 
         # Input box
         tracking_input = QLineEdit()
@@ -177,7 +177,6 @@ class MainWindow(QMainWindow):
 # FOR ICON
 
     def resizeEvent(self, event):
-        """Called whenever the window is resized"""
         self.update_icon()
         super().resizeEvent(event)
 
@@ -214,13 +213,11 @@ class MainWindow(QMainWindow):
 
     def open_admin_via_login(self):
         dlg = LoginDialog(self)
-        if dlg.exec() == QDialog.DialogCode.Accepted:  # ✅ explicit check
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             self.open_admin()
 
     def open_admin(self):
-        # Always create a fresh admin window
         if self.admin_win is not None:
-            # Clean up any existing window
             try:
                 self.admin_win.back_requested.disconnect(self.on_admin_back)
             except:
@@ -246,7 +243,7 @@ class MainWindow(QMainWindow):
             except Exception:
                 pass
             self.admin_win.close()
-            self.admin_win = None  # Add this line!
+            self.admin_win = None
         self.show()
 
 

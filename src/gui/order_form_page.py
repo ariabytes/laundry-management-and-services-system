@@ -401,10 +401,10 @@ class AddOrderDialog(QDialog):
             return
 
         try:
-            # 1️⃣ Add or get customer (you can change to reuse logic if you have that)
+            # Add or get customer
             cust_id = add_customer(name, contact, email, address)
 
-            # 2️⃣ Determine payment and order statuses
+            # Determine payment and order statuses
             method_id = self.payment_method_combo.currentData()
             status_id = self.payment_status_combo.currentData()
             status_text = self.payment_status_combo.currentText().strip().lower()
@@ -417,7 +417,7 @@ class AddOrderDialog(QDialog):
                 order_status_id = next(
                     (s["order_status_id"] for s in all_statuses if s["order_status_name"].strip(
                     ).lower() == "queueing"),
-                    1  # fallback if not found
+                    1
                 )
             else:
                 # If not paid, order should start as "Pending Payment"
@@ -427,18 +427,16 @@ class AddOrderDialog(QDialog):
                     1  # fallback if not found
                 )
 
-            # 3️⃣ Add order
+            # Add order
             order_id = add_order(cust_id, order_status_id,
                                  datetime.now(), total)
 
-            # 4️⃣ Add order items (important — this was missing)
-            # Use stored service_id; if missing, try to match by name as fallback
+            # Add order items
             from models.service import get_all_services
             all_services = get_all_services()
             for sel in selected:
                 sid = sel.get("service_id")
                 if not sid:
-                    # fallback: match by name (less reliable)
                     svc = next(
                         (s for s in all_services if s["service_name"] == sel["service_name"]), None)
                     sid = svc["service_id"] if svc else None
@@ -451,7 +449,7 @@ class AddOrderDialog(QDialog):
                 # add_order_item returns lastrowid (or True/False depending on implementation)
                 add_order_item(order_id, sid, sel["qty"], float(sel["price"]))
 
-            # 5️⃣ Add payment record - Only set payment_date if status is "Paid"
+            # Add payment record - Only set payment_date if status is "Paid"
             amount_paid = Decimal(self.amount_paid_input.text() or "0")
 
             # Determine payment_date based on payment status

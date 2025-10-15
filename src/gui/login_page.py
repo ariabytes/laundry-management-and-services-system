@@ -87,7 +87,6 @@ class LoginDialog(QDialog):
                                 "Please enter username and password.")
             return
 
-        # ✅ Check credentials in DB
         record = admin.get_admin_by_username(username)
 
         if record and record["password"] == password:

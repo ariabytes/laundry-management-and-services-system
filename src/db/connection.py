@@ -4,11 +4,6 @@ from contextlib import contextmanager
 
 
 def get_db_connection():
-    """
-    Establishes and returns a connection to the MySQL database using XAMPP.
-    - Change host, user, password, and database as needed for your setup.
-    - Returns: a MySQL connection object if successful, otherwise None.
-    """
     try:
         connection = mysql.connector.connect(
             host="localhost",      # XAMPP MySQL server host
@@ -27,13 +22,6 @@ def get_db_connection():
 
 @contextmanager
 def db_cursor(conn, dictionary=True):
-    """
-    Context manager for MySQL cursor.
-    - conn: MySQL connection object.
-    - dictionary: If True, cursor returns rows as dictionaries (column names as keys).
-        If False, returns rows as tuples.
-    - Automatically closes the cursor when done, even if an error occurs.
-    """
     cursor = conn.cursor(dictionary=dictionary)
     try:
         yield cursor
