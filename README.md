@@ -559,7 +559,6 @@ python src/gui/main_window.py
 ### Customer Validation
 
 - Name and contact number are required
-- Email format validation (if provided)
 
 ---
 
