@@ -209,7 +209,7 @@ Local laundry shops often rely on manual, paper-based processes for managing ord
 
 ---
 
-## ðŸ—ƒï¸ Entity-Relationship Diagram
+## Entity-Relationship Diagram
 
 ```mermaid
 erDiagram
@@ -299,7 +299,7 @@ erDiagram
 
 ---
 
-## ðŸ"„ Sequence Diagram – Add Order Flow
+## Sequence Diagram – Add Order Flow
 
 ```mermaid
 sequenceDiagram
@@ -367,45 +367,44 @@ sequenceDiagram
 - **Decimal** - Precise monetary calculations
 
 ---
-
-## ðŸ" Project Structure
+## 🧺 Project Structure
 
 ```
 LaundrySystem/
-â"œâ"€â"€ src/
-â"‚   â"œâ"€â"€ db/                              # ðŸ—„ï¸ Database Layer
-â"‚   â"‚   â"œâ"€â"€ __init__.py                  # Package marker
-â"‚   â"‚   â"œâ"€â"€ connection.py                # Database connection & context manager
-â"‚   â"‚   â""â"€â"€ db_laundry.sql               # Database schema & initial data
-â"‚   â"‚
-â"‚   â"œâ"€â"€ models/                          # ðŸ"Š Business Logic & Data Layer
-â"‚   â"‚   â"œâ"€â"€ __init__.py                  # Package marker
-â"‚   â"‚   â"œâ"€â"€ admin.py                     # Admin authentication CRUD
-â"‚   â"‚   â"œâ"€â"€ customer_class.py            # Customer class with OOP methods
-â"‚   â"‚   â"œâ"€â"€ order.py                     # Order CRUD operations
-â"‚   â"‚   â"œâ"€â"€ order_item.py                # Order items management
-â"‚   â"‚   â"œâ"€â"€ order_status.py              # Order status CRUD
-â"‚   â"‚   â"œâ"€â"€ order_validator.py           # Business logic validators (OOP)
-â"‚   â"‚   â"œâ"€â"€ service.py                   # Service catalog CRUD
-â"‚   â"‚   â"œâ"€â"€ category.py                  # Service categories CRUD
-â"‚   â"‚   â"œâ"€â"€ payment.py                   # Payment CRUD operations
-â"‚   â"‚   â"œâ"€â"€ payment_method.py            # Payment methods CRUD
-â"‚   â"‚   â"œâ"€â"€ payment_status.py            # Payment status CRUD
-â"‚   â"‚   â""â"€â"€ status_factory.py            # Factory pattern for payment status (OOP)
-â"‚   â"‚
-â"‚   â""â"€â"€ gui/                             # ðŸ–¥ï¸ User Interface Layer
-â"‚       â"œâ"€â"€ __init__.py                  # Package marker
-â"‚       â"œâ"€â"€ main_window.py               # Main application window & entry point
-â"‚       â"œâ"€â"€ login_page.py                # Admin authentication dialog
-â"‚       â"œâ"€â"€ admin_page.py                # Order management interface (main admin view)
-â"‚       â"œâ"€â"€ order_form_page.py           # Add/Edit order dialog with validation
-â"‚       â"œâ"€â"€ track_order_page.py          # Customer order tracking interface
-â"‚       â"œâ"€â"€ services_page.py             # Service catalog display
-â"‚       â"œâ"€â"€ a_logo.png                   # Application icon (16x16, 32x32)
-â"‚       â""â"€â"€ a_main_logo.png              # Main logo banner image
-â"‚
-â"œâ"€â"€ .gitignore                           # Git ignore rules
-â""â"€â"€ README.md                            # Project documentation
+├── src/
+│   ├── db/                              # 🗄️ Database Layer
+│   │   ├── __init__.py                  # Package marker
+│   │   ├── connection.py                # Database connection & context manager
+│   │   └── db_laundry.sql               # Database schema & initial data
+│   │
+│   ├── gui/                             # 🖥️ User Interface Layer
+│   │   ├── __init__.py                  # Package marker
+│   │   ├── main_window.py               # Main application window & entry point
+│   │   ├── login_page.py                # Admin authentication dialog
+│   │   ├── admin_page.py                # Order management interface (main admin view)
+│   │   ├── order_form_page.py           # Add/Edit order dialog with validation
+│   │   ├── track_order_page.py          # Customer order tracking interface
+│   │   ├── services_page.py             # Service catalog display
+│   │   ├── a_logo.png                   # Application icon (16x16, 32x32)
+│   │   └── a_main_logo.png              # Main logo banner image
+│   │
+│   └── models/                          # 📊 Business Logic & Data Layer
+│       ├── __init__.py                  # Package marker
+│       ├── admin.py                     # Admin authentication CRUD
+│       ├── customer_class.py            # Customer class with OOP methods
+│       ├── order.py                     # Order CRUD operations
+│       ├── order_item.py                # Order items management
+│       ├── order_status.py              # Order status CRUD
+│       ├── order_validator.py           # Business logic validators (OOP)
+│       ├── service.py                   # Service catalog CRUD
+│       ├── category.py                  # Service categories CRUD
+│       ├── payment.py                   # Payment CRUD operations
+│       ├── payment_method.py            # Payment methods CRUD
+│       ├── payment_status.py            # Payment status CRUD
+│       └── status_factory.py            # Factory pattern for payment status (OOP)
+│
+├── .gitignore                           # Git ignore rules
+└── README.md                            # Project documentation
 ```
 
 ---
