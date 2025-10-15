@@ -607,6 +607,16 @@ python src/gui/main_window.py
 
 ---
 
+## Screenshots
+<img width="1366" height="768" alt="Screenshot (298)" src="https://github.com/user-attachments/assets/f42a8b08-3c53-4f3e-b73a-af8a66b89dec" />
+<img width="1366" height="768" alt="Screenshot (299)" src="https://github.com/user-attachments/assets/a0848813-d511-4622-9cf3-b17d2b04eeb9" />
+<img width="1366" height="768" alt="Screenshot (300)" src="https://github.com/user-attachments/assets/66e624df-0375-4aa3-a2bf-15acb466fb9b" />
+<img width="1366" height="768" alt="Screenshot (301)" src="https://github.com/user-attachments/assets/56a30dd8-a1ff-4619-9380-428c9aec8338" />
+<img width="1366" height="768" alt="Screenshot (302)" src="https://github.com/user-attachments/assets/4043601d-9195-4bff-a858-6c79fcde98ce" />
+<img width="1366" height="768" alt="Screenshot (303)" src="https://github.com/user-attachments/assets/abe5dad7-42c4-4d0e-83cd-bf16c9f75c6e" />
+
+---
+
 ## Credits & References
 
 - **PyQt6 Documentation**: https://www.riverbankcomputing.com/static/Docs/PyQt6/
