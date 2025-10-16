@@ -5,6 +5,36 @@
 The **La Lavandera Laundry Monitoring and Services System** is a desktop application built with Python and PyQt6, featuring a MySQL backend. It streamlines laundry shop operations by enabling administrators to manage orders, payments, and customer information efficiently, while allowing clients to conveniently track their laundry status using a unique Order ID.
 
 ---
+## 📋 Project Revisions (Based on Panel Feedback)
+
+### Panel Recommendation: "Apply more OOP concepts"
+
+In response to panel feedback, I implemented the four pillars of Object-Oriented Programming:
+
+#### 1. **Encapsulation**
+- **Customer Class** (`models/customer_class.py`)
+  - Groups customer data and methods together
+  - Uses `@classmethod` for `get_by_id()` and `get_all()`
+  - Provides `save()` and `delete()` methods
+
+#### 2. **Inheritance**
+- **Payment Status Classes** (`models/status_factory.py`)
+  - Base `PaymentStatus` class
+  - Child classes: `PaidStatus`, `PendingStatus`, `PartialStatus`, `RefundedStatus`, `FailedStatus`
+  - Each inherits from the base class
+
+#### 3. **Polymorphism**
+- **Payment Status Behavior**
+  - Same method names (`get_payment_date()`, `get_amount_paid()`) work differently for each status
+  - `PaidStatus.get_payment_date()` returns current date
+  - `PendingStatus.get_payment_date()` returns None
+
+#### 4. **Abstraction**
+- **Validator Classes** (`models/order_validator.py`)
+  - Hides complex validation logic
+  - Simple method calls like `validate_customer_info()` and `validate_order_items()`
+  - Business rules are hidden from the GUI
+---
 
 ## Problem Statement
 
@@ -56,28 +86,30 @@ Local laundry shops often rely on manual, paper-based processes for managing ord
 - **Responsive Design** - Intuitive navigation and user feedback
 
 ---
-
 ## 🎓 OOP Concepts Applied
 
 ### 1. **Encapsulation**
 
-- **Customer Class**: Encapsulates customer data and operations
+Grouping related data and methods together in a class.
+
+- **Customer Class**: Keeps customer data and operations in one place
 
   ```python
   class Customer:
       def __init__(self, customer_id, name, phone, email, address):
-          self.customer_id = customer_id  # Private data
+          self.customer_id = customer_id
           self.name = name
+          self.phone = phone
           # ... other attributes
 
-      def save(self):  # Public method
-          # Encapsulates database logic
+      def save(self):
+          # Save customer to database
 
-      def to_dict(self):  # Data transformation
-          # Returns dictionary representation
+      def delete(self):
+          # Delete customer from database
   ```
 
-- **Database Connection**: Encapsulates connection management
+- **Database Connection**: Manages database connections safely
   ```python
   @contextmanager
   def db_cursor(conn, dictionary=True):
@@ -90,92 +122,68 @@ Local laundry shops often rely on manual, paper-based processes for managing ord
 
 ### 2. **Inheritance**
 
-- **Payment Status Hierarchy**: Base class with specialized subclasses
+Creating child classes that inherit properties and methods from a parent class.
+
+- **Payment Status Classes**: Child classes inherit from base PaymentStatus class
 
   ```python
-  class PaymentStatus:  # Base class
+  class PaymentStatus:  # Parent class
       def get_payment_date(self):
           return None
 
-  class PaidStatus(PaymentStatus):  # Derived class
+  class PaidStatus(PaymentStatus):  # Child class
       def get_payment_date(self):
-          return datetime.now()  # Override behavior
+          return datetime.now()
 
-  class RefundedStatus(PaymentStatus):  # Another derived class
-      def get_amount_paid(self, total_price):
-          return Decimal("0")  # Different behavior
+  class PendingStatus(PaymentStatus):  # Another child class
+      def get_payment_date(self):
+          return None
   ```
 
 ### 3. **Polymorphism**
 
-- **Method Overriding**: Different payment statuses have different behaviors
+Same method name behaves differently for different classes.
+
+- **Different Payment Status Behaviors**: Same method, different results
 
   ```python
-  status = PaymentStatusFactory.create("Paid")
-  payment_date = status.get_payment_date()  # Returns datetime.now()
+  # Same method name, different behavior
+  paid_status = PaidStatus()
+  paid_status.get_payment_date()  # Returns datetime.now()
 
-  status = PaymentStatusFactory.create("Pending")
-  payment_date = status.get_payment_date()  # Returns None
+  pending_status = PendingStatus()
+  pending_status.get_payment_date()  # Returns None
+
+  refunded_status = RefundedStatus()
+  refunded_status.get_amount_paid(1000)  # Returns 0
   ```
-
-- **Interface Consistency**: All status classes implement the same methods but with different logic
 
 ### 4. **Abstraction**
 
-- **Validator Classes**: Abstract away complex validation logic
+Hiding complex logic behind simple method calls.
+
+- **Validator Classes**: Complex validation hidden behind simple methods
 
   ```python
   class OrderValidator:
       def validate_customer_info(self, name, phone, email, address):
-          # Complex validation hidden from caller
+          # Complex validation logic hidden here
+          # User just calls the method
 
       def validate_order_items(self, items):
-          # Business rules abstracted
+          # Business rules hidden from caller
   ```
 
-- **Payment Processor**: Abstracts payment calculations
+- **Payment Processor**: Hides calculation details
   ```python
   class PaymentProcessor:
       @staticmethod
       def calculate_total(order_items):
-          # Calculation logic abstracted
+          # Calculation logic hidden
 
       @staticmethod
-      def determine_payment_status_from_amount(amount_paid, total_price):
+      def determine_payment_status(amount_paid, total_price):
           # Decision logic hidden
-  ```
-
-### 5. **Factory Pattern**
-
-- **PaymentStatusFactory**: Creates appropriate status objects
-  ```python
-  class PaymentStatusFactory:
-      @classmethod
-      def create(cls, status_name):
-          status_key = status_name.lower().strip()
-          status_class = cls._status_map.get(status_key)
-          if status_class:
-              return status_class()
-          return PaymentStatus(status_name)
-  ```
-
-### 6. **Single Responsibility Principle**
-
-- Each class has a single, well-defined purpose:
-  - `Customer` - Manages customer data
-  - `OrderValidator` - Validates order-related data
-  - `PaymentProcessor` - Handles payment calculations
-  - `OrderStatusManager` - Manages order status transitions
-
-### 7. **Composition**
-
-- GUI components composed of multiple parts:
-  ```python
-  class AdminWindow:
-      def __init__(self):
-          self.model = OrdersTableModel()  # Has-a relationship
-          self.table = QTableView()         # Has-a relationship
-          self.validator = OrderValidator() # Has-a relationship
   ```
 
 ---
@@ -409,74 +417,6 @@ LaundrySystem/
 
 ---
 
-## Installation & Setup
-
-### Prerequisites
-
-1. **Python 3.8 or higher**
-
-   - Download from [python.org](https://www.python.org/downloads/)
-   - Ensure "Add Python to PATH" is checked during installation
-
-2. **XAMPP**
-   - Download from [apachefriends.org](https://www.apachefriends.org/)
-   - Install and start MySQL service
-
-### Step 1: Clone or Download Project
-
-```bash
-# Clone repository (if using Git)
-git clone https://github.com/yourusername/laundry-system.git
-cd laundry-system
-
-# Or download and extract ZIP file
-```
-
-### Step 2: Install Python Dependencies
-
-```bash
-# Create virtual environment (recommended)
-python -m venv venv
-
-# Activate virtual environment
-# Windows:
-venv\Scripts\activate
-# macOS/Linux:
-source venv/bin/activate
-
-# Install required packages
-pip install PyQt6 mysql-connector-python
-```
-
-### Step 3: Setup Database
-
-1. **Start XAMPP** and ensure MySQL is running
-2. **Open phpMyAdmin** (http://localhost/phpmyadmin)
-3. **Import Database:**
-
-   - Click "New" to create database named `db_laundry`
-   - Select `db_laundry` database
-   - Click "Import" tab
-   - Choose file: `src/db/db_laundry.sql`
-   - Click "Go" to import
-
-4. **Verify Admin Account:**
-   - Navigate to `admin` table
-   - Ensure at least one admin record exists
-   - Default credentials should be in the database
-
-### Step 4: Run Application
-
-```bash
-# Navigate to project directory
-cd LaundrySystem
-
-# Run main application
-python src/gui/main_window.py
-```
-
----
-
 ## Usage Guide
 
 ### For Administrators
@@ -614,14 +554,6 @@ python src/gui/main_window.py
 <img width="1366" height="768" alt="Screenshot (301)" src="https://github.com/user-attachments/assets/56a30dd8-a1ff-4619-9380-428c9aec8338" />
 <img width="1366" height="768" alt="Screenshot (302)" src="https://github.com/user-attachments/assets/4043601d-9195-4bff-a858-6c79fcde98ce" />
 <img width="1366" height="768" alt="Screenshot (303)" src="https://github.com/user-attachments/assets/abe5dad7-42c4-4d0e-83cd-bf16c9f75c6e" />
-
----
-
-## Credits & References
-
-- **PyQt6 Documentation**: https://www.riverbankcomputing.com/static/Docs/PyQt6/
-- **MySQL Documentation**: https://dev.mysql.com/doc/
-- **Python MySQL Connector**: https://dev.mysql.com/doc/connector-python/
 
 ---
 
