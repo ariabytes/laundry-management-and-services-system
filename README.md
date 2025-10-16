@@ -5,7 +5,7 @@
 The **La Lavandera Laundry Monitoring and Services System** is a desktop application built with Python and PyQt6, featuring a MySQL backend. It streamlines laundry shop operations by enabling administrators to manage orders, payments, and customer information efficiently, while allowing clients to conveniently track their laundry status using a unique Order ID.
 
 ---
-## 📋 Project Revisions (Based on Panel Feedback)
+## Project Revisions (Based on Panel Feedback)
 
 ### Panel Recommendation: "Apply more OOP concepts"
 
@@ -86,7 +86,7 @@ Local laundry shops often rely on manual, paper-based processes for managing ord
 - **Responsive Design** - Intuitive navigation and user feedback
 
 ---
-## 🎓 OOP Concepts Applied
+## OOP Concepts Applied
 
 ### 1. **Encapsulation**
 
